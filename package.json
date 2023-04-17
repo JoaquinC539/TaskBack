@@ -1,0 +1,43 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "Task and logic management and set of api rest",
+  "main": "index.js",
+  "scripts": {
+    "test": "test",
+    "start": "node index",
+    "dev": "nodemon index"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JoaquinC539/TaskBack.git"
+  },
+  "keywords": [
+    "task",
+    "management",
+    "backend",
+    "logic",
+    "jwt"
+  ],
+  "author": "JC",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/JoaquinC539/TaskBack/issues"
+  },
+  "homepage": "https://github.com/JoaquinC539/TaskBack#readme",
+  "dependencies": {
+    "bcrypt": "^5.1.0",
+    "body-parser": "^1.20.2",
+    "cookie-parser": "^1.4.6",
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.3",
+    "express": "^4.18.2",
+    "joi": "^17.9.1",
+    "jsonwebtoken": "^9.0.0",
+    "moment": "^2.29.4",
+    "mongoose": "^7.0.4",
+    "multiparty": "^4.2.3",
+    "nodemon": "^2.0.22",
+    "typescript": "^4.9.5"
+  }
+}
