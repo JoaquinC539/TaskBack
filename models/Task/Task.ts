@@ -10,7 +10,8 @@ const taskSchema=new mongoose.Schema({
         max:50
     },
     userID:{
-        type:Number
+        type:Number,
+        required:true
     },
     type:{
         type:String,
@@ -26,6 +27,7 @@ const taskSchema=new mongoose.Schema({
     },
     completion:{
         type:Boolean,
+        required:true,
         date:Date.now
     },
     comment:{

@@ -9,6 +9,7 @@ class Router {
     constructor() {
         this.routes = express.Router();
         this.routes.get('', controller.view);
+        this.routes.post('/team', controller.newTeam);
     }
 }
 exports.Router = Router;
