@@ -1,5 +1,6 @@
 {
     "allowedOrigins":[
-        "localhost:3000"
+        "localhost:3000",
+        "177.247.107.38/32"
     ]
 }

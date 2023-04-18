@@ -7,6 +7,7 @@ const app=new App(Number(process.env.PORT) ||3500);
 
 dbConnection.connectDB(String(process.env.DB_URI))
 .then(()=>{app.serverCreate()})
+.catch((error)=>console.log(error));
 
 
 
