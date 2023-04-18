@@ -9,5 +9,7 @@ class Controller {
     view(req, res) {
         res.sendFile(path.join(__dirname, '..', 'views', 'index.html'));
     }
+    newTeam(req, res) {
+    }
 }
 exports.Controller = Controller;

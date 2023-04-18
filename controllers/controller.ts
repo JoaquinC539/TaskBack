@@ -8,4 +8,7 @@ export class Controller{
     view(req:any,res:any){
         res.sendFile(path.join(__dirname,'..','views','index.html'));
     }
+    newTeam(req:any,res:any){
+        
+    }
 }
