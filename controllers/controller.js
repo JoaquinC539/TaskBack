@@ -95,5 +95,66 @@ class Controller {
             }
         });
     }
+    login(req, res) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const user = yield userModel.findOne({ name: req.body.name });
+                if (!user || user === null) {
+                    return res.status(404).json({ error: "User not found" });
+                }
+                const password = yield bcrypt.compare(req.body.password, user.password);
+                if (!password || password === null || password === undefined) {
+                    return res.status(401).json({ error: "Invalid or incorrect password" });
+                }
+                const token = jwt.sign({
+                    name: user.name,
+                    _id: user._id,
+                    role: user.role,
+                    teamId: user.teamId
+                }, process.env.TOKEN, { expiresIn: process.env.EXPIRE_TOKEN });
+                const refreshToken = jwt.sign({
+                    name: user.name,
+                    _id: user._id,
+                    role: user.role,
+                    teamId: user.teamId
+                }, process.env.REFRESH_TOKEN, { expiresIn: process.env.EXPIRE_RTOKEN });
+                res.cookie('jwt', refreshToken, {
+                    httpOnly: true,
+                    secure: true,
+                    sameSite: 'None',
+                    maxAge: 2 * 24 * 60 * 60 * 1000
+                });
+                return res.header('Authorization', "Bearer " + token).json({
+                    error: null,
+                    data: { token: "Bearer " + token },
+                });
+            }
+            catch (error) {
+                res.status(500).json({ error: "Internal Server error", description: error });
+            }
+        });
+    }
+    protectedMethod(req, res) {
+        return __awaiter(this, void 0, void 0, function* () {
+            return res.json({
+                message: "Verified"
+            });
+        });
+    }
+    refreshToken(req, res) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const user = yield req.user;
+            const token = yield jwt.sign({
+                name: user.name,
+                _id: user._id,
+                role: user.role,
+                teamId: user.teamId
+            }, process.env.TOKEN, { expiresIn: process.env.EXPIRE_TOKEN });
+            return res.header('Authorization', "Bearer " + token).json({
+                error: null,
+                data: { token: "Bearer " + token },
+            });
+        });
+    }
 }
 exports.Controller = Controller;

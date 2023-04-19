@@ -64,9 +64,57 @@ export class Controller{
 
         } catch (error) {
             return res.status(500).send(error);
-        }
-
- 
-        
+        }        
     }
+    async login(req:any,res:any){
+        try{
+            const user=await userModel.findOne({name:req.body.name});
+            if(!user || user===null){return res.status(404).json({error:"User not found"})}
+            const password:string=await bcrypt.compare(req.body.password,user.password);
+            if(!password || password===null || password===undefined){ return res.status(401).json({error:"Invalid or incorrect password"})}
+            const token=jwt.sign({
+                name:user.name,
+                _id:user._id,
+                role:user.role,
+                teamId:user.teamId
+            },process.env.TOKEN as string,{expiresIn:process.env.EXPIRE_TOKEN as string});
+            const refreshToken=jwt.sign({
+                name:user.name,
+                _id:user._id,
+                role:user.role,
+                teamId:user.teamId
+            },process.env.REFRESH_TOKEN as string,{expiresIn:process.env.EXPIRE_RTOKEN as string});
+            res.cookie('jwt',refreshToken,{
+                httpOnly:true,
+                secure:true,
+                sameSite:'None',
+                maxAge:2*24*60*60*1000
+            });
+           return res.header('Authorization',"Bearer "+token).json({
+            error:null,
+            data:{token:"Bearer "+token},
+           });
+        }catch(error){
+            res.status(500).json({error:"Internal Server error",description:error});
+        }
+    }
+   async protectedMethod(req:any,res:any){
+    return res.json({
+        message:"Verified"
+    });
+   }
+   async refreshToken(req:any,res:any){
+    const user=await req.user;
+    const token=await jwt.sign({
+        name:user.name,
+        _id:user._id,
+        role:user.role,
+        teamId:user.teamId
+    },process.env.TOKEN as string,{expiresIn:process.env.EXPIRE_TOKEN as string});
+    return res.header('Authorization',"Bearer "+token).json({
+        error:null,
+        data:{token:"Bearer "+token},
+       });
+   } 
+
 }

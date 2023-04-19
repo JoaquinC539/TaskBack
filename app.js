@@ -8,6 +8,7 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const path = require('path');
 const allowedOrigins = require('./config/allowedOrigins.json');
+const cookieParser = require('cookie-parser');
 require('dotenv').config();
 class App {
     constructor(port) {
@@ -19,6 +20,7 @@ class App {
         this.app.use(cors(this.cors.corsOption));
         this.app.use(bodyParser.urlencoded({ extended: false }));
         this.app.use(bodyParser.json());
+        this.app.use(cookieParser());
         //Routes
         this.app.use('/api', express.static(path.join(__dirname, 'views')));
         this.app.use('/api', this.router.routes);
