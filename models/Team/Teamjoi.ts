@@ -1,7 +1,7 @@
-const joi=require('joi');
+import Joi from "joi";
 
-const teamRegisterSchema=joi.object({
-    name:joi.string().min(5).max(35).required()
+const teamRegisterSchema=Joi.object({
+    name:Joi.string().min(5).max(35).required()
 });
 
 module.exports=teamRegisterSchema

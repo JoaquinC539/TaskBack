@@ -6,6 +6,8 @@ export class Router{
     public routes=express.Router();
     constructor(){
         this.routes.get('',controller.view);
-        this.routes.post('/team',controller.newTeam)
+        this.routes.post('/team',controller.newTeam);
+        this.routes.post('/admin',controller.newAdminUser);
+        this.routes.get('/team/:id',controller.getTeam)
     }
 }

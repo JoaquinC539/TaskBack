@@ -1,19 +1,20 @@
-import mongoose from "mongoose";
+import mongoose from 'mongoose';
 
 const userSchema=new mongoose.Schema({
     name:{
         type:String,
         required:true,
-        min:5,
+        min:4,
         max:100
     },
     password:{
         type:String,
         required:true,
-        min:10
+        min:7,
+        max:255
     },
-    teamID:{
-        type:Number,
+    teamId:{
+        type:String,
         required:true,
     },
     role:{
