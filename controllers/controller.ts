@@ -1,3 +1,4 @@
+import { string } from "joi";
 
 const mongoose=require('mongoose');
 const path=require('path');
@@ -69,7 +70,7 @@ export class Controller{
     async login(req:any,res:any){
         try{
             const user=await userModel.findOne({name:req.body.name});
-            if(!user || user===null){return res.status(404).json({error:"User not found"})}
+            if(!user || user===null || user==undefined){return res.status(404).json({error:"User not found"})}
             const password:string=await bcrypt.compare(req.body.password,user.password);
             if(!password || password===null || password===undefined){ return res.status(401).json({error:"Invalid or incorrect password"})}
             const token=jwt.sign({
@@ -117,4 +118,42 @@ export class Controller{
        });
    } 
 
+   async getUser(req:any,res:any){   
+    try {
+        type User={
+            teamId:string,
+            name:string,
+            role:string,
+            _id:string
+        }
+        const query={} as User
+        query.teamId=req.user.teamId;
+        if(req.query.name){
+            query.name=req.query.name;
+        }
+        if(req.query._id){
+            query._id=req.query._id
+        }
+        if(req.query.role){
+            query.role=req.query.role
+        }
+    
+
+        
+            await userModel.find(query).exec()
+            .then((response:any)=>{return res.status(200).json(response)})
+            .catch((err:any)=>{return res.status(500).json(err)})
+         
+    } catch (error) {
+        return res.status(500).json({error})
+    }
+    
+    
+   }
+   async newUser(req:any,res:any){
+
+    res.json({message:"working"});
+   }
 }
+
+

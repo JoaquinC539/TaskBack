@@ -99,7 +99,7 @@ class Controller {
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 const user = yield userModel.findOne({ name: req.body.name });
-                if (!user || user === null) {
+                if (!user || user === null || user == undefined) {
                     return res.status(404).json({ error: "User not found" });
                 }
                 const password = yield bcrypt.compare(req.body.password, user.password);
@@ -154,6 +154,34 @@ class Controller {
                 error: null,
                 data: { token: "Bearer " + token },
             });
+        });
+    }
+    getUser(req, res) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const query = {};
+                query.teamId = req.user.teamId;
+                if (req.query.name) {
+                    query.name = req.query.name;
+                }
+                if (req.query._id) {
+                    query._id = req.query._id;
+                }
+                if (req.query.role) {
+                    query.role = req.query.role;
+                }
+                yield userModel.find(query).exec()
+                    .then((response) => { return res.status(200).json(response); })
+                    .catch((err) => { return res.status(500).json(err); });
+            }
+            catch (error) {
+                return res.status(500).json({ error });
+            }
+        });
+    }
+    newUser(req, res) {
+        return __awaiter(this, void 0, void 0, function* () {
+            res.json({ message: "working" });
         });
     }
 }

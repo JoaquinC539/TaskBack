@@ -16,6 +16,8 @@ class Router {
         this.routes.post('/login', controller.login);
         this.routes.get('/jwtTest', tokenVerify, controller.protectedMethod);
         this.routes.get('/refresh', refreshTokenVerify, controller.refreshToken);
+        this.routes.get('/user', tokenVerify, controller.getUser);
+        this.routes.post('/user', tokenVerify, controller.newUser);
     }
 }
 exports.Router = Router;
