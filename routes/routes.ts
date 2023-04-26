@@ -1,11 +1,19 @@
 const express=require('express');
-const path=require('path');
 import { Controller } from "../controllers/controller";
+const tokenVerify=require('../middleware/tokenVerify');
+const refreshTokenVerify=require('../middleware/refreshTokenVerify');
 const controller=new Controller();
 export class Router{
     public routes=express.Router();
     constructor(){
         this.routes.get('',controller.view);
-        
+        this.routes.post('/team',controller.newTeam);
+        this.routes.post('/admin',controller.newAdminUser);
+        this.routes.get('/team/:id',controller.getTeam);
+        this.routes.post('/login',controller.login);
+        this.routes.get('/jwtTest',tokenVerify,controller.protectedMethod);
+        this.routes.get('/refresh',refreshTokenVerify,controller.refreshToken);
+        this.routes.get('/user',tokenVerify,controller.getUser);
+        this.routes.post('/user',tokenVerify,controller.newUser);
     }
 }
