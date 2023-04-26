@@ -24,6 +24,12 @@ class Controller {
     view(req, res) {
         res.sendFile(path.join(__dirname, '..', 'views', 'index.html'));
     }
+    /**
+     *
+     * @param req name: Team name to be generated
+     * @param res team name and id
+     * @returns json response and new team saved into DB
+     */
     newTeam(req, res) {
         return __awaiter(this, void 0, void 0, function* () {
             const { error } = teamJoi.validate(req.body);
@@ -43,6 +49,12 @@ class Controller {
             }
         });
     }
+    /**
+     *
+     * @param req name: User name, password: Password used to get access to the teeam, teamId: Id of a team to be linked the new team
+     * @param res json with new user containing name, hashed password, teamId and admin role by default
+     * @returns status 200 or error and first admin user saved into the DB
+     */
     newAdminUser(req, res) {
         return __awaiter(this, void 0, void 0, function* () {
             const { error } = adminJoi.validate(req.body);
@@ -79,6 +91,12 @@ class Controller {
             }
         });
     }
+    /**
+     *
+     * @param req Get a team by Id using params
+     * @param res The team data (id and name)
+     * @returns json
+     */
     getTeam(req, res) {
         return __awaiter(this, void 0, void 0, function* () {
             if ((req.params.id).length !== 24) {
@@ -95,14 +113,21 @@ class Controller {
             }
         });
     }
+    /**
+     *
+     * @param req name: User name already registered, password: access password created previously
+     * @param res Authorization token inside a json and a cookie with refresh token
+     * @returns json
+     */
     login(req, res) {
         return __awaiter(this, void 0, void 0, function* () {
+            console.log(req.body);
             try {
                 const user = yield userModel.findOne({ name: req.body.name });
                 if (!user || user === null || user == undefined) {
                     return res.status(404).json({ error: "User not found" });
                 }
-                const password = yield bcrypt.compare(req.body.password, user.password);
+                const password = yield bcrypt.compare(String(req.body.password), String(user.password));
                 if (!password || password === null || password === undefined) {
                     return res.status(401).json({ error: "Invalid or incorrect password" });
                 }
@@ -130,7 +155,7 @@ class Controller {
                 });
             }
             catch (error) {
-                res.status(500).json({ error: "Internal Server error", description: error });
+                return res.status(500).json({ error: "Internal Server error", description: error });
             }
         });
     }
@@ -141,6 +166,12 @@ class Controller {
             });
         });
     }
+    /**
+     *
+     * @param req Cookie 'jwt' with refresh token
+     * @param res json containing a new shortlived access token
+     * @returns json
+     */
     refreshToken(req, res) {
         return __awaiter(this, void 0, void 0, function* () {
             const user = yield req.user;
@@ -156,6 +187,12 @@ class Controller {
             });
         });
     }
+    /**
+     * Query function controller for Users inside the team of the user using the team Id signed into the access token.
+     * @param req query params including name, role, teamId eg: 'user?name=John Doe
+     * @param res object containing all query matched results
+     * @returns json
+     */
     getUser(req, res) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
@@ -179,9 +216,55 @@ class Controller {
             }
         });
     }
+    /**
+     * Create a new user signed using teamId of who creates with an admin role
+     * @param req body: name, password and role token: role, teamId role values: "admin", "supervisor", "employee"
+     * @param res json with the new user
+     */
     newUser(req, res) {
         return __awaiter(this, void 0, void 0, function* () {
-            res.json({ message: "working" });
+            console.log(req.user);
+            try {
+                if (req.user.role !== "admin") {
+                    return res.status(403).json({ error: "Not authorized to create a new user. Only admin roles can do this" });
+                }
+                if (!req.user) {
+                    return res.status(401).json({ error: "Authnetication couldn't be solved" });
+                }
+                if (!req.body) {
+                    return res.status(400).json({ error: "There is no body to create a new user" });
+                }
+                let { error } = userJoi.validate(req.body);
+                if (error) {
+                    return res.status(400).json(error);
+                }
+                if (!req.body.role || req.body.role === undefined || req.body.role == null) {
+                    return res.status(401).json({ error: "Not role defined" });
+                }
+                if (req.body.role !== "supervisor" && req.body.role !== "admin" && req.body.role !== "employee") {
+                    return res.status(401).json({ error: "Not valid role" });
+                }
+                const teamId = new mongoose.Types.ObjectId(req.user.teamId);
+                const team = yield TeamModel.findById(teamId);
+                if (!team || team == null) {
+                    return res.status(404).json({ error: "Team not found" });
+                }
+                const salt = yield bcrypt.genSalt(10);
+                const hashedPassword = yield bcrypt.hash(String(req.body.password), salt);
+                const user = yield new userModel({
+                    name: req.body.name,
+                    password: hashedPassword,
+                    role: req.body.role,
+                    teamId: req.user.teamId
+                });
+                yield user.save()
+                    .then((response) => { return res.status(200).json(response); })
+                    .catch((error) => { return res.status(500).json(error); });
+            }
+            catch (error) {
+                console.log(error);
+                res.json(error);
+            }
         });
     }
 }
