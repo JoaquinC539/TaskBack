@@ -10,9 +10,26 @@ const userJoi=require('../models/User/Userjoi');
 const userModel=require('../models/User/User');
 const adminJoi=require('../models/User/AdminJoi');
 
+type User={
+    teamId:string,
+    name:string,
+    role:string,
+    _id:string,
+    password:string,
+    error:string
+}
+
+type Error={
+    
+        message:string | null,
+        error:any
+    
+}
 export class Controller{
 
-    constructor(){}
+    constructor(){
+
+    }
     view(req:any,res:any){
         res.sendFile(path.join(__dirname,'..','views','index.html'));
     }
@@ -93,7 +110,6 @@ export class Controller{
      * @returns json
      */
     async login(req:any,res:any){
-        console.log( req.body);
         try{
             const user=await userModel.findOne({name:req.body.name});
             if(!user || user===null || user==undefined){return res.status(404).json({error:"User not found"})}
@@ -126,11 +142,6 @@ export class Controller{
         }
     }
 
-   async protectedMethod(req:any,res:any){
-    return res.json({
-        message:"Verified"
-    });
-   }
    /**
     * 
     * @param req Cookie 'jwt' with refresh token
@@ -158,13 +169,7 @@ export class Controller{
     */
    async getUser(req:any,res:any){   
     try {
-        type User={
-            teamId:string,
-            name:string,
-            role:string,
-            _id:string,
-            password:string
-        }
+
         const query={} as User
         query.teamId=req.user.teamId;
         if(req.query.name){
@@ -190,15 +195,14 @@ export class Controller{
     
    }
    /**
-    * Create a new user signed using teamId of who creates with an admin role
+    * Create a new user of a team. Only can be created by someone with admin role. Team id is gotten from credentials
     * @param req body: name, password and role token: role, teamId role values: "admin", "supervisor", "employee"
     * @param res json with the new user
     */
    async newUser(req:any,res:any){
-    console.log(req.user)
     try {
-        if(req.user.role!=="admin" ){return res.status(403).json({error:"Not authorized to create a new user. Only admin roles can do this"})}
-        if(!req.user){return res.status(401).json({error:"Authnetication couldn't be solved"})}
+        if(req.user.role!=="admin" ){return res.status(403).json({Unauthorized:"Not authorized to create a new user. Only admin roles can do this"})}
+        if(!req.user){return res.status(401).json({error:"Authentication couldn't be solved"})}
         if (!req.body){return res.status(400).json({error:"There is no body to create a new user"})}
         let {error}=userJoi.validate(req.body);        
         if(error){return res.status(400).json(error)}
@@ -223,9 +227,63 @@ export class Controller{
         console.log(error);
         res.json(error);
     }
-
-
    }
+   /**
+    * Updates user role, password, name and/or role, note: employee  and supervisor can't modify their role just admins. To modify name and password only can be done by the user itself
+    * @param req data of fields to be changed and user _id
+    * @param res json with new data (hashed password)
+    */
+   async editUser(req:any,res:any){
+    if(!req || req===undefined || req===null){return res.json({error:"Bad request"})}
+    if(!req.body || req.body===undefined || req.body===null ){return res.json({error:"Bad request"})}
+    try {
+        let personalUpdate:boolean=false
+        let roleUpdate:boolean=false
+        if(!req.body._id ){return res.status(400).json({error:"Not id provided "})}
+        if(req.body._id.length!==24){return res.status(400).json({error:"Bad id provided"})}
+        if(typeof req.body._id !=="string"){return res.status(400).json({error:"Bad request"})}
+        if(req.body._id)
+        if(req.body._id && req.user._id==req.body._id){personalUpdate=true}
+        if(req.user.role==="admin"){roleUpdate=true}
+        if(!personalUpdate && req.body.name || !personalUpdate && req.body.password){return res.status(401).json({Unauthorized:"Not allowed to edit names and personal information of others"})}
+        if(!roleUpdate && req.body.role){return res.status(401).json({Unauthorized:"Not allowed to modify your or others roles. Ask and admin to do that"})}
+        const targetId=await new mongoose.Types.ObjectId(String(req.body._id));
+        const userQuery=await userModel.findById(targetId);
+        if(!userQuery || userQuery===null || userQuery===undefined){return res.status(404).json({error:"User not found"})}
+        if(userQuery.teamId!==req.user.teamId){return res.status(402).json({forbidden:"Not allowed to modified another teams"})}
+        let user=await {} as User;
+        let response=await {} as Error;
+        response.message=null;
+
+
+        if(req.body.name && personalUpdate){user.name=req.body.name }
+        if(req.body.password && personalUpdate){ 
+            const salt=await bcrypt.genSalt(10);
+            const hashedPassword=await bcrypt.hash(String(req.body.password),salt);
+            user.password=hashedPassword; 
+        }
+         if(roleUpdate && req.body.role){
+            if(req.user.role==="admin" ){
+                
+                if((req.body.role=="admin" || req.body.role=="supervisor" || req.body.role=="employee")){
+                    user.role=req.body.role;
+                }else{
+                    return res.status(400).json({error:"Not valid role "})
+                }
+            }
+            else{response.message="Role is not an admin, role wasn't changed."}
+         }
+         
+          await userModel.findOneAndUpdate( {_id:targetId},user);
+         const queriedUser=await userModel.findOne({_id:targetId});
+
+        return res.status(200).json({user:queriedUser,error:response})
+    } catch (error) {
+        return res.json(error);
+    }
+   }
+
+
 }
 
 

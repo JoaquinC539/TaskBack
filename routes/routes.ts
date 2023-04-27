@@ -11,9 +11,10 @@ export class Router{
         this.routes.post('/admin',controller.newAdminUser);
         this.routes.get('/team/:id',controller.getTeam);
         this.routes.post('/login',controller.login);
-        this.routes.get('/jwtTest',tokenVerify,controller.protectedMethod);
         this.routes.get('/refresh',refreshTokenVerify,controller.refreshToken);
         this.routes.get('/user',tokenVerify,controller.getUser);
         this.routes.post('/user',tokenVerify,controller.newUser);
+        this.routes.put('/user',tokenVerify,controller.editUser);
+
     }
 }
