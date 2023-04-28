@@ -10,6 +10,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Controller = void 0;
+const taskjJoi_1 = require("../models/Task/taskjJoi");
 const mongoose = require('mongoose');
 const path = require('path');
 const bcrypt = require('bcrypt');
@@ -19,6 +20,7 @@ const teamJoi = require('../models/Team/Teamjoi');
 const userJoi = require('../models/User/Userjoi');
 const userModel = require('../models/User/User');
 const adminJoi = require('../models/User/AdminJoi');
+const taskModel = require('../models/Task/Task');
 class Controller {
     constructor() {
     }
@@ -335,6 +337,79 @@ class Controller {
             }
             catch (error) {
                 return res.json(error);
+            }
+        });
+    }
+    /**
+     * Delete one user, only admin role can perform this action
+     * @param req _id:24 length string
+     * @param res error or status 200 operation
+     * @returns void
+     */
+    deleteUser(req, res) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                if (!req.body || !req.body._id || req.body._id === null || req.body._id === undefined) {
+                    return res.status(400).json({ error: "Not id provided or error in request" });
+                }
+                if (req.user.role !== "admin") {
+                    return res.status(402).json({ Unauthorized: "Just an admin role can perform this action" });
+                }
+                if (req.body._id.length !== 24) {
+                    return res.status(401).json({ Error: "Error in id or not valid" });
+                }
+                let targetId;
+                let validId = yield mongoose.Types.ObjectId.isValid(req.body._id);
+                if (validId) {
+                    console.log(mongoose.Types.ObjectId.isValid(req.body._id));
+                    targetId = req.body._id;
+                }
+                else {
+                    targetId = yield new mongoose.Types.ObjectId(String(req.body._id));
+                }
+                const userToDelete = yield userModel.findById(targetId);
+                if (!userToDelete || userToDelete === null || userToDelete === undefined) {
+                    return res.status(200).json({ error: "User to delete not found" });
+                }
+                if (userToDelete.teamId !== req.user.teamId) {
+                    return res.status(401).json({ Unauthorized: "Can't modify other teams" });
+                }
+                yield userModel.deleteOne({ _id: targetId })
+                    .then((response) => { console.log(response); })
+                    .catch((error) => console.log(error));
+                return res.status(200).json({ message: "Operation succesful" });
+            }
+            catch (error) {
+                console.log(error);
+                return res.status(500).json({ error: "An error ocurred" });
+            }
+        });
+    }
+    newTask(req, res) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const { error } = taskjJoi_1.taskJoi.validate(req.body);
+            if (error) {
+                return res.status(401).json({ error: "Error in team creation check the error", description: error.details[0].message });
+            }
+            if (req.user.role !== "admin" && req.user.role !== "supervisor") {
+                return res.status(402).json({ Unaothorized: "Not authorized, only admin or supervisor can asign new tasks" });
+            }
+            try {
+                const task = new taskModel({
+                    title: req.body.title,
+                    senderName: req.user.name,
+                    userId: req.body.userId,
+                    type: req.body.type,
+                    description: req.body.description,
+                    completion: false,
+                    comment: req.body.comment
+                });
+                yield task.save()
+                    .then((response) => res.status(200).json(response))
+                    .catch((error) => res.status(500).json(error));
+            }
+            catch (error) {
+                return res.status(500).json(error);
             }
         });
     }

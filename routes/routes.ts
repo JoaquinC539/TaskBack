@@ -15,6 +15,8 @@ export class Router{
         this.routes.get('/user',tokenVerify,controller.getUser);
         this.routes.post('/user',tokenVerify,controller.newUser);
         this.routes.put('/user',tokenVerify,controller.editUser);
+        this.routes.delete('/user',tokenVerify,controller.deleteUser);
+        this.routes.post('/task',tokenVerify,controller.newTask);
 
     }
 }

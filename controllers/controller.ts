@@ -1,5 +1,5 @@
 import { string } from "joi";
-
+import { taskJoi } from "../models/Task/taskjJoi";
 const mongoose=require('mongoose');
 const path=require('path');
 const bcrypt=require('bcrypt');
@@ -9,6 +9,7 @@ const teamJoi=require('../models/Team/Teamjoi');
 const userJoi=require('../models/User/Userjoi');
 const userModel=require('../models/User/User');
 const adminJoi=require('../models/User/AdminJoi');
+const taskModel=require('../models/Task/Task');
 
 type User={
     teamId:string,
@@ -282,7 +283,64 @@ export class Controller{
         return res.json(error);
     }
    }
+   /**
+    * Delete one user, only admin role can perform this action
+    * @param req _id:24 length string
+    * @param res error or status 200 operation
+    * @returns void
+    */
+   async deleteUser(req:any,res:any){
+    try {
+        
+        if(!req.body ||!req.body._id || req.body._id===null || req.body._id===undefined){return res.status(400).json({error:"Not id provided or error in request"})}
+        if(req.user.role!=="admin"){return res.status(402).json({Unauthorized:"Just an admin role can perform this action"})}
+        if(req.body._id.length!==24){return res.status(401).json({Error:"Error in id or not valid"})}
+        let targetId:any
+        let validId:any=await mongoose.Types.ObjectId.isValid(req.body._id)
+        if(validId){
+            console.log(mongoose.Types.ObjectId.isValid(req.body._id))
+            targetId=req.body._id
+        }else{
+            targetId=await new mongoose.Types.ObjectId(String(req.body._id));
+        }
+        const userToDelete:any=await userModel.findById(targetId);
+        if(!userToDelete || userToDelete===null || userToDelete===undefined){return res.status(200).json({error:"User to delete not found"})}
+        if(userToDelete.teamId!==req.user.teamId){return res.status(401).json({Unauthorized:"Can't modify other teams"})}
+        await userModel.deleteOne({_id:targetId})
+        .then((response:any)=>{console.log(response)})
+        .catch((error:any)=>console.log(error));
+        return res.status(200).json({message:"Operation succesful"});
 
+       
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({error:"An error ocurred"});
+    }
+
+   }    
+   async newTask(req:any,res:any){
+    const {error}=taskJoi.validate(req.body);
+    if(error){return res.status(401).json({error:"Error in team creation check the error",description:error.details[0].message})}
+    if(req.user.role!=="admin" && req.user.role!=="supervisor"){return res.status(402).json({Unaothorized:"Not authorized, only admin or supervisor can asign new tasks"});}
+    try {
+        const task=new taskModel({
+            title:req.body.title,
+            senderName:req.user.name,
+            userId:req.body.userId,
+            type:req.body.type,
+            description:req.body.description,
+            completion:false,
+            comment:req.body.comment
+         });
+         await task.save()
+         .then((response:any)=>res.status(200).json(response))
+         .catch((error:any)=>res.status(500).json(error))
+        
+    } catch (error) {
+        return res.status(500).json(error);
+    }
+
+   }
 
 }
 
