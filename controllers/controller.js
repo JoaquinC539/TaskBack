@@ -385,17 +385,33 @@ class Controller {
             }
         });
     }
+    /**
+     * Add as new task to somebody, admin can assign tasks to himself and other admins, supervisor and employees. Supervisor can assugn task to himelf and employees. Employees can't
+     * @param req title, userId, type, description and optional comment
+     * @param res
+     */
     newTask(req, res) {
         return __awaiter(this, void 0, void 0, function* () {
             const { error } = taskjJoi_1.taskJoi.validate(req.body);
             if (error) {
-                return res.status(401).json({ error: "Error in team creation check the error", description: error.details[0].message });
+                return res.status(401).json({ error: "Error in task creation check the error", description: error.details[0].message });
             }
             if (req.user.role !== "admin" && req.user.role !== "supervisor") {
-                return res.status(402).json({ Unaothorized: "Not authorized, only admin or supervisor can asign new tasks" });
+                return res.status(402).json({ Unauthorized: "Not authorized, only admin or supervisor can asign new tasks" });
+            }
+            let targetUser = yield userModel.find({ teamId: req.user.teamId, _id: req.body.userId }).exec();
+            if (!targetUser || targetUser == null || targetUser == undefined || !targetUser.length) {
+                return res.status(404).json({ error: "Employee not found" });
+            }
+            if (targetUser[0].role == "admin") {
+                return res.status(402).json({ error: "Supervisor can't assign task to admin" });
+            }
+            if (targetUser[0].role == "supervisor" && targetUser[0]._id.toString() !== req.user._id) {
+                return res.status(402).json({ error: "Cant assign tasks to other supervisors except self" });
             }
             try {
                 const task = new taskModel({
+                    teamId: req.user.teamId,
                     title: req.body.title,
                     senderName: req.user.name,
                     userId: req.body.userId,
@@ -409,6 +425,72 @@ class Controller {
                     .catch((error) => res.status(500).json(error));
             }
             catch (error) {
+                return res.status(500).json(error);
+            }
+        });
+    }
+    getTasks(req, res) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const query = {};
+                query.teamId = req.user.teamId;
+                if (req.user.role === "employee") {
+                    query.userId = req.user._id;
+                }
+                if (req.user.role === "supervisor") {
+                    let queriedEmployee = yield userModel.find({ teamId: req.user.teamId, role: "employee" }).exec();
+                    const employeesIds = queriedEmployee.map((employee) => employee._id.toString());
+                    employeesIds.push(req.user._id.toString());
+                    if (req.query.userId) {
+                        if (employeesIds.includes(req.query.userId)) {
+                            query.userId = req.query.userId;
+                        }
+                        else {
+                            return res.status(404).json({ error: "Employee not found or higher hierarchy tasks not allowed to retreat" });
+                        }
+                    }
+                    else {
+                        query.userId = { $in: employeesIds };
+                    }
+                }
+                if (req.user.role === "admin") {
+                    if (req.query.userId) {
+                        query.userId = req.query.userId;
+                    }
+                }
+                if (req.query.title) {
+                    query.title = req.query.title;
+                }
+                if (req.query.senderName) {
+                    query.senderName = req.query.senderName;
+                }
+                if (req.query.type) {
+                    query.type = req.query.type;
+                }
+                if (req.query.description) {
+                    query.description = req.query.description;
+                }
+                if (req.query.completion) {
+                    query.completion = req.query.completion;
+                }
+                if (req.query.comment) {
+                    query.comment = req.query.comment;
+                }
+                if (req.query.assignment) {
+                    query.assignment = req.query.assignment;
+                }
+                try {
+                    yield taskModel.find(query)
+                        .then((response) => res.status(200).json(response))
+                        .catch((err) => console.log(err));
+                    return;
+                }
+                catch (error) {
+                    return res.status(500).json(error);
+                }
+            }
+            catch (error) {
+                console.log(error);
                 return res.status(500).json(error);
             }
         });

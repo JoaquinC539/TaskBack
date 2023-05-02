@@ -45,6 +45,10 @@ const taskSchema = new mongoose_1.default.Schema({
     assignment: {
         type: Date,
         default: Date.now
-    }
+    },
+    teamId: {
+        type: String,
+        required: true
+    },
 });
 module.exports = mongoose_1.default.model('Task', taskSchema);

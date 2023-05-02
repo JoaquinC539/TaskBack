@@ -1,3 +1,4 @@
+import { string } from 'joi';
 import mongoose from 'mongoose';
 
 
@@ -43,7 +44,12 @@ const taskSchema=new mongoose.Schema({
     assignment:{
         type:Date,
         default:Date.now
-    }
+    },
+    teamId:{
+        type:String,
+        required:true
+    },
+    
 
 });
 
