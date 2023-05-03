@@ -442,8 +442,9 @@ class Controller {
                     const employeesIds = queriedEmployee.map((employee) => employee._id.toString());
                     employeesIds.push(req.user._id.toString());
                     if (req.query.userId) {
-                        if (employeesIds.includes(req.query.userId)) {
-                            query.userId = req.query.userId;
+                        let queryUserIds = (req.query.userId.split(","));
+                        if (employeesIds.some((id) => queryUserIds.includes(id))) {
+                            query.userId = { $in: queryUserIds };
                         }
                         else {
                             return res.status(404).json({ error: "Employee not found or higher hierarchy tasks not allowed to retreat" });
@@ -451,11 +452,13 @@ class Controller {
                     }
                     else {
                         query.userId = { $in: employeesIds };
+                        console.log(query);
                     }
                 }
                 if (req.user.role === "admin") {
                     if (req.query.userId) {
-                        query.userId = req.query.userId;
+                        let queryUserIds = (req.query.userId.split(","));
+                        query.userId = { $in: queryUserIds };
                     }
                 }
                 if (req.query.title) {
