@@ -429,6 +429,12 @@ class Controller {
             }
         });
     }
+    /**
+     * Query task from the DB using role permissions, employees can only retreat their own taks, supervisor can see employees and self tasks, admins can query all the data from every person in the team
+     * @param req query params: multiple userId, _id,name,title, completion,senderName,comment,type,assignment
+     * @param res query data or error if not authorized or according data
+     *
+     */
     getTasks(req, res) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
@@ -495,6 +501,63 @@ class Controller {
             catch (error) {
                 console.log(error);
                 return res.status(500).json(error);
+            }
+        });
+    }
+    updateTask(req, res) {
+        return __awaiter(this, void 0, void 0, function* () {
+            function buildObject() {
+                let update = {};
+                if (req.body.title) {
+                    update.title = req.body.title;
+                }
+                if (req.body.type) {
+                    update.type = req.body.type;
+                }
+                if (req.body.description) {
+                    update.description = req.body.description;
+                }
+                if (req.body.completion) {
+                    update.completion = req.body.completion;
+                }
+                if (req.body.comment) {
+                    update.comment = req.body.comment;
+                }
+                return update;
+            }
+            if (req.body.teamId) {
+                return res.status(403).json({ forbidden: "Can't change task of teamId" });
+            }
+            if (req.body.senderName || req.body.assignment || req.body.userId) {
+                return res.status(403).json({ forbidden: "Can't change sender, assign date or userId" });
+            }
+            try {
+                if (!req.body._id) {
+                    return res.status(400).json({ error: "No Task Id provided (_id)" });
+                }
+                if (req.body._id.length !== 24 && req.query._id.length !== 24) {
+                    return res.status(400).json({ error: "Bad task Id request" });
+                }
+                const taskId = yield new mongoose.Types.ObjectId(String(req.body._id));
+                if (req.user.role && req.user.role === "employee") {
+                    let employeeTask = yield taskModel.findById(req.body._id);
+                    if (!employeeTask || employeeTask == null || employeeTask === undefined) {
+                        return res.status(404).json({ error: "Task not found" });
+                    }
+                    if (employeeTask.userId == req.user._id) {
+                        yield taskModel.findOneAndUpdate({ _id: taskId }, buildObject()).exec();
+                        return yield res.json({ update: "success" });
+                    }
+                    else {
+                        return res.status(401).json({ error: "Not authorized" });
+                    }
+                }
+                else {
+                    return res.json({ default: "default" });
+                }
+            }
+            catch (error) {
+                return res.status(500).json({ error: error });
             }
         });
     }
