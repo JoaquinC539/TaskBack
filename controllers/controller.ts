@@ -443,7 +443,7 @@ export class Controller{
     }
    }/**
     * Edit a Task, credentials role not required to edit a task
-    * @param req _id task id, and/or title, type, description, completion, and comment || Can't be updated:  teamId, senderName, req.body.assignment, userId, RoleType
+    * @param req _id task id, and/or title, type, description, completion, and comment || Can't be updated:  teamId, senderName, req.body.assignment, userId, RoleType (Admin exception).
     * @param res success or error json
     */
    async updateTask(req:any,res:any){
@@ -495,6 +495,15 @@ export class Controller{
             return res.status(500).json({error:error});
         }
    }
+   /**
+    * Delete a task according to parameters and role.
+    * Admin can delete every task without restriction under the same team.
+    * Supervisor can only delete it's own tasks asigned by itself or admins and employees
+    * Employees can't delete any task
+    * @param req _id
+    * @param res success message or error
+    *  
+    */
    async deleteTask(req:any,res:any):Promise<any>{
     if((!req.body._id || req.body._id.length!==24) && typeof req.body._id!=="string"){res.status(402).json({})}
     if(req.user.role==="employee"){res.status(402).json({error:"Not authorized to perform this action"});}
@@ -516,7 +525,10 @@ export class Controller{
         .then((response:Response)=>res.status(200).json({message:"Task deleted",response:response}))
         .catch((error:Error)=>res.status(500).json({error:error}));
     }
-   } 
+   }
+   async editTeam(req:any,res:any){
+
+   }
 
 }
 

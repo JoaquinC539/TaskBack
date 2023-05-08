@@ -507,7 +507,7 @@ class Controller {
         });
     } /**
      * Edit a Task, credentials role not required to edit a task
-     * @param req _id task id, and/or title, type, description, completion, and comment || Can't be updated:  teamId, senderName, req.body.assignment, userId, RoleType
+     * @param req _id task id, and/or title, type, description, completion, and comment || Can't be updated:  teamId, senderName, req.body.assignment, userId, RoleType (Admin exception).
      * @param res success or error json
      */
     updateTask(req, res) {
@@ -568,6 +568,15 @@ class Controller {
             }
         });
     }
+    /**
+     * Delete a task according to parameters and role.
+     * Admin can delete every task without restriction under the same team.
+     * Supervisor can only delete it's own tasks asigned by itself or admins and employees
+     * Employees can't delete any task
+     * @param req _id
+     * @param res success message or error
+     *
+     */
     deleteTask(req, res) {
         return __awaiter(this, void 0, void 0, function* () {
             if ((!req.body._id || req.body._id.length !== 24) && typeof req.body._id !== "string") {
@@ -601,6 +610,10 @@ class Controller {
                     .then((response) => res.status(200).json({ message: "Task deleted", response: response }))
                     .catch((error) => res.status(500).json({ error: error }));
             }
+        });
+    }
+    editTeam(req, res) {
+        return __awaiter(this, void 0, void 0, function* () {
         });
     }
 }
