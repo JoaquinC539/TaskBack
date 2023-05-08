@@ -31,6 +31,7 @@ type Task={
     senderName:string,
     userId:any,
     type:string,
+    roleType:string,
     description:string,
     completion:boolean,
     comment:string,
@@ -328,7 +329,7 @@ export class Controller{
    } 
    /**
     * Add as new task to somebody, admin can assign tasks to himself and other admins, supervisor and employees. Supervisor can assugn task to himelf and employees. Employees can't
-    * @param req title, userId, type, description and optional comment
+    * @param req title, userId, type, description, roleType and optional comment
     * @param res 
     */   
    async newTask(req:any,res:any){
@@ -337,8 +338,9 @@ export class Controller{
     if(req.user.role!=="admin" && req.user.role!=="supervisor"){return res.status(402).json({Unauthorized:"Not authorized, only admin or supervisor can asign new tasks"});}
     let targetUser=await userModel.find({teamId:req.user.teamId,_id:req.body.userId}).exec();
     if(!targetUser || targetUser==null || targetUser==undefined || !targetUser.length){return res.status(404).json({error:"Employee not found"});}
-    if(targetUser[0].role=="admin"){return res.status(402).json({error:"Supervisor can't assign task to admin"});}
-    if(targetUser[0].role=="supervisor" && targetUser[0]._id.toString()!==req.user._id){return res.status(402).json({error:"Cant assign tasks to other supervisors except self"}) }
+    if(targetUser[0].role=="admin" && req.user.role!=="admin"){return res.status(402).json({error:"Only admin can assign task to admin"});}
+    if(targetUser[0].role=="supervisor" && targetUser[0]._id.toString()!==req.user._id && req.user.role!=="admin"){return res.status(402).json({error:"Cant assign tasks to other supervisors except self"}) }
+    if(req.user.role=="supervsior" && (req.body.roleType=="admin" )){return res.status(402).json({error:"A supervisor can't assign admn type role tasks"})}
     try {
         const task=new taskModel({
             teamId:req.user.teamId,
@@ -346,6 +348,7 @@ export class Controller{
             senderName:req.user.name,
             userId:req.body.userId,
             type:req.body.type,
+            roleType:targetUser[0].role,
             description:req.body.description,
             completion:false,
             comment:req.body.comment
@@ -384,7 +387,7 @@ export class Controller{
                 }else{return res.status(404).json({error:"Employee not found or higher hierarchy tasks not allowed to retreat"})}
             }else{
                query.userId={$in:employeesIds}
-               console.log(query);
+            
                
             }
         }
@@ -438,7 +441,12 @@ export class Controller{
         console.log(error);
         return res.status(500).json(error);
     }
-   }
+   }/**
+    * Edit a Task, credentials role not required to edit a task
+    * @param req _id task id, and/or title, type, description, completion, and comment || Can't be updated:  teamId, senderName, req.body.assignment, userId, RoleType
+    * @param res 
+    * @returns 
+    */
    async updateTask(req:any,res:any){
         function buildObject(){
             let update={} as Task;
@@ -462,27 +470,17 @@ export class Controller{
             return update
         }
     if(req.body.teamId){return res.status(403).json({forbidden:"Can't change task of teamId"})}   
-    if(req.body.senderName || req.body.assignment || req.body.userId){return res.status(403).json({forbidden:"Can't change sender, assign date or userId"})} 
-        try {
+    if(req.body.senderName || req.body.assignment || req.body.userId || req.body.roleType){return res.status(403).json({forbidden:"Can't change sender, assign date, userId or roleType task"})}         try {
             if(!req.body._id ){return res.status(400).json({error:"No Task Id provided (_id)"})}
             if(req.body._id.length!==24 && req.query._id.length!==24){
                 return res.status(400).json({error:"Bad task Id request"});
             }
-            
-            const taskId=await new mongoose.Types.ObjectId(String(req.body._id));               
-            
-            if(req.user.role && req.user.role==="employee"){
-                
-                let employeeTask=await taskModel.findById(req.body._id);
+
+                const taskId=await new mongoose.Types.ObjectId(String(req.body._id));               
+                const employeeTask=await taskModel.findById(req.body._id);
                 if(!employeeTask||employeeTask==null || employeeTask===undefined){return res.status(404).json({error:"Task not found"})}
-                
-                if(employeeTask.userId==req.user._id){
-                   await taskModel.findOneAndUpdate({_id:taskId},buildObject()).exec();
-                      
-                    return await res.json({update:"success"});
-                }else{return res.status(401).json({error:"Not authorized"})}
-                
-            }else{return res.json({default:"default"})}
+                await taskModel.findOneAndUpdate({_id:taskId,teamId:req.user.teamId},buildObject()).exec();                      
+                return await res.json({update:"success"});
         } catch (error) {
             return res.status(500).json({error:error})
         }

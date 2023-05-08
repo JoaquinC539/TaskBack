@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.taskJoi = void 0;
 const joi_1 = __importDefault(require("joi"));
+const validRoles = ["employee", "supervisor", "aadmin"];
 exports.taskJoi = joi_1.default.object({
     title: joi_1.default.string().min(4).max(120).required(),
     userId: joi_1.default.string().min(24).max(24).required(),

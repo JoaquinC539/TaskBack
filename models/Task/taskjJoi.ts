@@ -1,5 +1,5 @@
 import Joi from "joi";
-
+const validRoles=["employee","supervisor","aadmin"]
 export const taskJoi=Joi.object({
     title:Joi.string().min(4).max(120).required(),
     userId:Joi.string().min(24).max(24).required(),

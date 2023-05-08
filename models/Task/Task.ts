@@ -18,6 +18,11 @@ const taskSchema=new mongoose.Schema({
         type:String,
         required:true
     },
+    roleType:{
+        type:String,
+        required:true,
+        
+    },
     type:{
         type:String,
         required:true,
