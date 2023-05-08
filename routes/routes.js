@@ -22,6 +22,7 @@ class Router {
         this.routes.post('/task', tokenVerify, controller.newTask);
         this.routes.get('/task', tokenVerify, controller.getTasks);
         this.routes.put('/task', tokenVerify, controller.updateTask);
+        this.routes.delete('/task', tokenVerify, controller.deleteTask);
     }
 }
 exports.Router = Router;

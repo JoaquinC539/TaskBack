@@ -1,4 +1,3 @@
-import { string } from "joi";
 import { taskJoi } from "../models/Task/taskjJoi";
 const mongoose=require('mongoose');
 const path=require('path');
@@ -10,6 +9,7 @@ const userJoi=require('../models/User/Userjoi');
 const userModel=require('../models/User/User');
 const adminJoi=require('../models/User/AdminJoi');
 const taskModel=require('../models/Task/Task');
+const Error=mongoose.Error
 
 type User={
     teamId:string,
@@ -52,7 +52,7 @@ export class Controller{
      * @param res team name and id
      * @returns json response and new team saved into DB
      */
-    async newTeam(req:any,res:any){
+    async newTeam(req:any,res:any):Promise<any>{
             const {error}=teamJoi.validate(req.body);
             if(error){return res.status(400).json({error:"Error in team creation check the error",description:error.details[0].message})}         
             try {
@@ -72,7 +72,7 @@ export class Controller{
      * @param res json with new user containing name, hashed password, teamId and admin role by default
      * @returns status 200 or error and first admin user saved into the DB
      */
-    async newAdminUser(req:any,res:any){
+    async newAdminUser(req:any,res:any):Promise<any>{
         const {error} =adminJoi.validate(req.body);      
         if(error){return res.status(400).json({error:"Error in team creation check the error",description:error.details[0].message})}         
         if((req.body.teamId).length!==24){return res.status(409).json({error:"Bad Id, check the id and try again"})}
@@ -104,7 +104,7 @@ export class Controller{
      * @param res The team data (id and name)
      * @returns json
      */
-    async getTeam(req:any,res:any){
+    async getTeam(req:any,res:any):Promise<any>{
         if((req.params.id).length!==24){return res.status(409).json({error:"Bad Id, check the id and try again"})}
         try {
             const id=new mongoose.Types.ObjectId(req.params.id)
@@ -122,7 +122,7 @@ export class Controller{
      * @param res Authorization token inside a json and a cookie with refresh token
      * @returns json
      */
-    async login(req:any,res:any){
+    async login(req:any,res:any):Promise<any>{
         try{
             const user=await userModel.findOne({name:req.body.name});
             if(!user || user===null || user==undefined){return res.status(404).json({error:"User not found"})}
@@ -161,7 +161,7 @@ export class Controller{
     * @param res json containing a new shortlived access token
     * @returns json
     */
-   async refreshToken(req:any,res:any){
+   async refreshToken(req:any,res:any):Promise<any>{
     const user=await req.user;
     const token=await jwt.sign({
         name:user.name,
@@ -180,7 +180,7 @@ export class Controller{
     * @param res object containing all query matched results
     * @returns json
     */
-   async getUser(req:any,res:any){   
+   async getUser(req:any,res:any):Promise<any>{   
     try {
 
         const query={} as User
@@ -209,7 +209,7 @@ export class Controller{
     * @param req body: name, password and role token: role, teamId role values: "admin", "supervisor", "employee"
     * @param res json with the new user
     */
-   async newUser(req:any,res:any){
+   async newUser(req:any,res:any):Promise<any>{
     try {
         if(req.user.role!=="admin" ){return res.status(403).json({Unauthorized:"Not authorized to create a new user. Only admin roles can do this"})}
         if(!req.user){return res.status(401).json({error:"Authentication couldn't be solved"})}
@@ -218,9 +218,9 @@ export class Controller{
         if(error){return res.status(400).json(error)}
         if(!req.body.role || req.body.role===undefined ||req.body.role==null){return res.status(401).json({error:"Not role defined"})}
         if(req.body.role!== "supervisor" && req.body.role!=="admin" && req.body.role!=="employee"){return res.status(401).json({error:"Not valid role"})}
-        const teamId=new mongoose.Types.ObjectId(req.user.teamId);
-        const team=await TeamModel.findById(teamId);
-        if(!team || team==null){return res.status(404).json({error:"Team not found"})}
+        // const teamId=new mongoose.Types.ObjectId(req.user.teamId);
+        // const team=await TeamModel.findById(teamId);
+        // if(!team || team==null){return res.status(404).json({error:"Team not found"})}
         const salt= await bcrypt.genSalt(10);
         const hashedPassword=await bcrypt.hash(String(req.body.password),salt);
         const user= await new userModel({
@@ -243,7 +243,7 @@ export class Controller{
     * @param req data of fields to be changed and user _id
     * @param res json with new data (hashed password)
     */
-   async editUser(req:any,res:any){
+   async editUser(req:any,res:any):Promise<any>{
     if(!req || req===undefined || req===null){return res.json({error:"Bad request"})}
     if(!req.body || req.body===undefined || req.body===null ){return res.json({error:"Bad request"})}
     try {
@@ -258,7 +258,7 @@ export class Controller{
         if(!personalUpdate && req.body.name || !personalUpdate && req.body.password){return res.status(401).json({Unauthorized:"Not allowed to edit names and personal information of others"})}
         if(!roleUpdate && req.body.role){return res.status(401).json({Unauthorized:"Not allowed to modify your or others roles. Ask and admin to do that"})}
         const targetId=await new mongoose.Types.ObjectId(String(req.body._id));
-        const userQuery=await userModel.findById(targetId);
+        const userQuery=await userModel.find({_id:targetId,teamId:req.user.teamId});
         if(!userQuery || userQuery===null || userQuery===undefined){return res.status(404).json({error:"User not found"})}
         if(userQuery.teamId!==req.user.teamId){return res.status(402).json({forbidden:"Not allowed to modified another teams"})}
         let user=await {} as User;
@@ -298,7 +298,7 @@ export class Controller{
     * @param res error or status 200 operation
     * @returns void
     */
-   async deleteUser(req:any,res:any){
+   async deleteUser(req:any,res:any):Promise<any>{
     try {
         
         if(!req.body ||!req.body._id || req.body._id===null || req.body._id===undefined){return res.status(400).json({error:"Not id provided or error in request"})}
@@ -312,7 +312,7 @@ export class Controller{
         }else{
             targetId=await new mongoose.Types.ObjectId(String(req.body._id));
         }
-        const userToDelete:any=await userModel.findById(targetId);
+        const userToDelete:any=await userModel.find({_id:targetId,teamId:req.user.teamId});
         if(!userToDelete || userToDelete===null || userToDelete===undefined){return res.status(200).json({error:"User to delete not found"})}
         if(userToDelete.teamId!==req.user.teamId){return res.status(401).json({Unauthorized:"Can't modify other teams"})}
         await userModel.deleteOne({_id:targetId})
@@ -332,7 +332,7 @@ export class Controller{
     * @param req title, userId, type, description, roleType and optional comment
     * @param res 
     */   
-   async newTask(req:any,res:any){
+   async newTask(req:any,res:any):Promise<any>{
     const {error}=taskJoi.validate(req.body);
     if(error){return res.status(401).json({error:"Error in task creation check the error",description:error.details[0].message})}
     if(req.user.role!=="admin" && req.user.role!=="supervisor"){return res.status(402).json({Unauthorized:"Not authorized, only admin or supervisor can asign new tasks"});}
@@ -367,7 +367,7 @@ export class Controller{
     * @param res query data or error if not authorized or according data
     * 
     */
-   async getTasks(req:any,res:any){
+   async getTasks(req:any,res:any):Promise<any>{
     try {
 
         const query={} as Task;
@@ -444,11 +444,10 @@ export class Controller{
    }/**
     * Edit a Task, credentials role not required to edit a task
     * @param req _id task id, and/or title, type, description, completion, and comment || Can't be updated:  teamId, senderName, req.body.assignment, userId, RoleType
-    * @param res 
-    * @returns 
+    * @param res success or error json
     */
    async updateTask(req:any,res:any){
-        function buildObject(){
+        function buildObject(role:string="employee"){
             let update={} as Task;
 
             if (req.body.title) {
@@ -466,25 +465,58 @@ export class Controller{
             if (req.body.comment) {
             update.comment = req.body.comment;
             }
+            if(role==="admin"){
+                if(req.body.roleType){
+                    update.roleType=req.body.roleType;
+                }
+                if(req.body.senderName){
+                    update.senderName=req.body.senderName;
+                }
+                if(req.body.userId){
+                    update.senderName=req.body.userId;
+                }
+            }   
 
             return update
         }
-    if(req.body.teamId){return res.status(403).json({forbidden:"Can't change task of teamId"})}   
-    if(req.body.senderName || req.body.assignment || req.body.userId || req.body.roleType){return res.status(403).json({forbidden:"Can't change sender, assign date, userId or roleType task"})}         try {
-            if(!req.body._id ){return res.status(400).json({error:"No Task Id provided (_id)"})}
-            if(req.body._id.length!==24 && req.query._id.length!==24){
-                return res.status(400).json({error:"Bad task Id request"});
-            }
+    if(req.body.teamId){return res.status(403).json({forbidden:"Can't change task of teamId"})}
+    if(!req.body._id ){return res.status(400).json({error:"No Task Id provided (_id)"})}
+    if(req.body._id.length!==24 && req.query._id.length!==24){
+        return res.status(400).json({error:"Bad task Id request"});
+    }
+    if((req.body.senderName || req.body.assignment || req.body.userId || req.body.roleType) && req.user.role!=="admin"){return res.status(403).json({forbidden:"Can't change sender, assign date, userId or roleType task"})}         try {
 
                 const taskId=await new mongoose.Types.ObjectId(String(req.body._id));               
-                const employeeTask=await taskModel.findById(req.body._id);
+                const employeeTask=await taskModel.find({_id:req.body._id,teamId:req.user.teamId});
                 if(!employeeTask||employeeTask==null || employeeTask===undefined){return res.status(404).json({error:"Task not found"})}
-                await taskModel.findOneAndUpdate({_id:taskId,teamId:req.user.teamId},buildObject()).exec();                      
+                await taskModel.findOneAndUpdate({_id:taskId,teamId:req.user.teamId},buildObject(req.user.role)).exec();                      
                 return await res.json({update:"success"});
         } catch (error) {
-            return res.status(500).json({error:error})
+            return res.status(500).json({error:error});
         }
    }
+   async deleteTask(req:any,res:any):Promise<any>{
+    if((!req.body._id || req.body._id.length!==24) && typeof req.body._id!=="string"){res.status(402).json({})}
+    if(req.user.role==="employee"){res.status(402).json({error:"Not authorized to perform this action"});}
+    else if(req.user.role==="supervisor"){
+        const _id=new mongoose.Types.ObjectId(String(req.body._id));
+        let task=await taskModel.findById(_id).exec();
+        if(!task || task===null || task===undefined){return res.status(404).json({error:"Task not found"})}
+        if(task.roleType==="employee" || (task.roleType==="supervisor" && task.userId===String(req.user._id))){
+           await taskModel.deleteOne({_id:_id,teamId:req.user.teamId})
+           .then((response:Response)=>res.status(200).json({message:"Task deleted",response:response}))
+           .catch((error:Error)=>res.status(500).json({error:error}));
+        }else{return res.status(402).json({error:"Not allowed to modify other supervisors or admin tasks"});}
+    }
+    else if(req.user.role==="admin"){
+        const _id=new mongoose.Types.ObjectId(String(req.body._id));
+        let task=await taskModel.findById(_id).exec();
+        if(!task || task===null || task===undefined){return res.status(404).json({error:"Task not found"})}
+        await taskModel.deleteOne({_id:_id,teamId:req.user.teamId})
+        .then((response:Response)=>res.status(200).json({message:"Task deleted",response:response}))
+        .catch((error:Error)=>res.status(500).json({error:error}));
+    }
+   } 
 
 }
 

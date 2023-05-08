@@ -21,6 +21,7 @@ const userJoi = require('../models/User/Userjoi');
 const userModel = require('../models/User/User');
 const adminJoi = require('../models/User/AdminJoi');
 const taskModel = require('../models/Task/Task');
+const Error = mongoose.Error;
 class Controller {
     constructor() {
     }
@@ -238,11 +239,9 @@ class Controller {
                 if (req.body.role !== "supervisor" && req.body.role !== "admin" && req.body.role !== "employee") {
                     return res.status(401).json({ error: "Not valid role" });
                 }
-                const teamId = new mongoose.Types.ObjectId(req.user.teamId);
-                const team = yield TeamModel.findById(teamId);
-                if (!team || team == null) {
-                    return res.status(404).json({ error: "Team not found" });
-                }
+                // const teamId=new mongoose.Types.ObjectId(req.user.teamId);
+                // const team=await TeamModel.findById(teamId);
+                // if(!team || team==null){return res.status(404).json({error:"Team not found"})}
                 const salt = yield bcrypt.genSalt(10);
                 const hashedPassword = yield bcrypt.hash(String(req.body.password), salt);
                 const user = yield new userModel({
@@ -300,7 +299,7 @@ class Controller {
                     return res.status(401).json({ Unauthorized: "Not allowed to modify your or others roles. Ask and admin to do that" });
                 }
                 const targetId = yield new mongoose.Types.ObjectId(String(req.body._id));
-                const userQuery = yield userModel.findById(targetId);
+                const userQuery = yield userModel.find({ _id: targetId, teamId: req.user.teamId });
                 if (!userQuery || userQuery === null || userQuery === undefined) {
                     return res.status(404).json({ error: "User not found" });
                 }
@@ -367,7 +366,7 @@ class Controller {
                 else {
                     targetId = yield new mongoose.Types.ObjectId(String(req.body._id));
                 }
-                const userToDelete = yield userModel.findById(targetId);
+                const userToDelete = yield userModel.find({ _id: targetId, teamId: req.user.teamId });
                 if (!userToDelete || userToDelete === null || userToDelete === undefined) {
                     return res.status(200).json({ error: "User to delete not found" });
                 }
@@ -509,12 +508,11 @@ class Controller {
     } /**
      * Edit a Task, credentials role not required to edit a task
      * @param req _id task id, and/or title, type, description, completion, and comment || Can't be updated:  teamId, senderName, req.body.assignment, userId, RoleType
-     * @param res
-     * @returns
+     * @param res success or error json
      */
     updateTask(req, res) {
         return __awaiter(this, void 0, void 0, function* () {
-            function buildObject() {
+            function buildObject(role = "employee") {
                 let update = {};
                 if (req.body.title) {
                     update.title = req.body.title;
@@ -531,31 +529,77 @@ class Controller {
                 if (req.body.comment) {
                     update.comment = req.body.comment;
                 }
+                if (role === "admin") {
+                    if (req.body.roleType) {
+                        update.roleType = req.body.roleType;
+                    }
+                    if (req.body.senderName) {
+                        update.senderName = req.body.senderName;
+                    }
+                    if (req.body.userId) {
+                        update.senderName = req.body.userId;
+                    }
+                }
                 return update;
             }
             if (req.body.teamId) {
                 return res.status(403).json({ forbidden: "Can't change task of teamId" });
             }
-            if (req.body.senderName || req.body.assignment || req.body.userId || req.body.roleType) {
+            if (!req.body._id) {
+                return res.status(400).json({ error: "No Task Id provided (_id)" });
+            }
+            if (req.body._id.length !== 24 && req.query._id.length !== 24) {
+                return res.status(400).json({ error: "Bad task Id request" });
+            }
+            if ((req.body.senderName || req.body.assignment || req.body.userId || req.body.roleType) && req.user.role !== "admin") {
                 return res.status(403).json({ forbidden: "Can't change sender, assign date, userId or roleType task" });
             }
             try {
-                if (!req.body._id) {
-                    return res.status(400).json({ error: "No Task Id provided (_id)" });
-                }
-                if (req.body._id.length !== 24 && req.query._id.length !== 24) {
-                    return res.status(400).json({ error: "Bad task Id request" });
-                }
                 const taskId = yield new mongoose.Types.ObjectId(String(req.body._id));
-                const employeeTask = yield taskModel.findById(req.body._id);
+                const employeeTask = yield taskModel.find({ _id: req.body._id, teamId: req.user.teamId });
                 if (!employeeTask || employeeTask == null || employeeTask === undefined) {
                     return res.status(404).json({ error: "Task not found" });
                 }
-                yield taskModel.findOneAndUpdate({ _id: taskId, teamId: req.user.teamId }, buildObject()).exec();
+                yield taskModel.findOneAndUpdate({ _id: taskId, teamId: req.user.teamId }, buildObject(req.user.role)).exec();
                 return yield res.json({ update: "success" });
             }
             catch (error) {
                 return res.status(500).json({ error: error });
+            }
+        });
+    }
+    deleteTask(req, res) {
+        return __awaiter(this, void 0, void 0, function* () {
+            if ((!req.body._id || req.body._id.length !== 24) && typeof req.body._id !== "string") {
+                res.status(402).json({});
+            }
+            if (req.user.role === "employee") {
+                res.status(402).json({ error: "Not authorized to perform this action" });
+            }
+            else if (req.user.role === "supervisor") {
+                const _id = new mongoose.Types.ObjectId(String(req.body._id));
+                let task = yield taskModel.findById(_id).exec();
+                if (!task || task === null || task === undefined) {
+                    return res.status(404).json({ error: "Task not found" });
+                }
+                if (task.roleType === "employee" || (task.roleType === "supervisor" && task.userId === String(req.user._id))) {
+                    yield taskModel.deleteOne({ _id: _id, teamId: req.user.teamId })
+                        .then((response) => res.status(200).json({ message: "Task deleted", response: response }))
+                        .catch((error) => res.status(500).json({ error: error }));
+                }
+                else {
+                    return res.status(402).json({ error: "Not allowed to modify other supervisors or admin tasks" });
+                }
+            }
+            else if (req.user.role === "admin") {
+                const _id = new mongoose.Types.ObjectId(String(req.body._id));
+                let task = yield taskModel.findById(_id).exec();
+                if (!task || task === null || task === undefined) {
+                    return res.status(404).json({ error: "Task not found" });
+                }
+                yield taskModel.deleteOne({ _id: _id, teamId: req.user.teamId })
+                    .then((response) => res.status(200).json({ message: "Task deleted", response: response }))
+                    .catch((error) => res.status(500).json({ error: error }));
             }
         });
     }
