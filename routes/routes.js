@@ -24,6 +24,7 @@ class Router {
         this.routes.put('/task', tokenVerify, controller.updateTask);
         this.routes.delete('/task', tokenVerify, controller.deleteTask);
         this.routes.put('/team', tokenVerify, controller.editTeam);
+        this.routes.delete('/team', tokenVerify, controller.deleteTeam);
     }
 }
 exports.Router = Router;

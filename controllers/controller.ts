@@ -570,7 +570,16 @@ export class Controller{
         return res.status(500).json({error:"Server Error",body:error});
     }
     }
-    
+    async deleteTeam(req:any,res:any){
+        if(req.user.role!=="admin" && req.user.department!=="direction"){return res.status(402).json({error:"Not allowed to delete a team"})}
+        let team=await TeamModel.findById(req.user.teamId);
+        if(!team || team===null || team===undefined){return res.status(404).json({error:"Team not found"})}
+        await taskModel.deleteMany({teamId:req.user.teamId});
+        await userModel.deleteMany({teamId:req.user.teamId});
+        await TeamModel.deleteOne({_id:req.user.teamId});
+        return res.status(201).json({message:"Team. task and users were deleted"});
+    }
+
 
 }
 

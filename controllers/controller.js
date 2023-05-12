@@ -668,5 +668,20 @@ class Controller {
             }
         });
     }
+    deleteTeam(req, res) {
+        return __awaiter(this, void 0, void 0, function* () {
+            if (req.user.role !== "admin" && req.user.department !== "direction") {
+                return res.status(402).json({ error: "Not allowed to delete a team" });
+            }
+            let team = yield TeamModel.findById(req.user.teamId);
+            if (!team || team === null || team === undefined) {
+                return res.status(404).json({ error: "Team not found" });
+            }
+            yield taskModel.deleteMany({ teamId: req.user.teamId });
+            yield userModel.deleteMany({ teamId: req.user.teamId });
+            yield TeamModel.deleteOne({ _id: req.user.teamId });
+            return res.status(201).json({ message: "Team. task and users were deleted" });
+        });
+    }
 }
 exports.Controller = Controller;
