@@ -20,6 +20,7 @@ export class Router{
         this.routes.get('/task',tokenVerify,controller.getTasks);
         this.routes.put('/task',tokenVerify,controller.updateTask);
         this.routes.delete('/task',tokenVerify,controller.deleteTask);
+        this.routes.put('/team',tokenVerify,controller.editTeam);
 
     }
 }
