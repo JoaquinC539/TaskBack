@@ -11,5 +11,6 @@ exports.taskJoi = joi_1.default.object({
     userId: joi_1.default.string().min(24).max(24).required(),
     type: joi_1.default.string().min(4).required(),
     description: joi_1.default.string().min(4).max(500).required(),
-    comment: joi_1.default.string()
+    comment: joi_1.default.string(),
+    department: joi_1.default.string().min(4).max(25).required()
 });

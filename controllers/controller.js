@@ -84,7 +84,8 @@ class Controller {
                     name: req.body.name,
                     password: hashedPassword,
                     teamId: req.body.teamId,
-                    role: "admin"
+                    role: "admin",
+                    department: "direction"
                 });
                 yield user.save()
                     .then(res.status(200).json(user))
@@ -138,13 +139,15 @@ class Controller {
                     name: user.name,
                     _id: user._id,
                     role: user.role,
-                    teamId: user.teamId
+                    teamId: user.teamId,
+                    department: user.department
                 }, process.env.TOKEN, { expiresIn: process.env.EXPIRE_TOKEN });
                 const refreshToken = jwt.sign({
                     name: user.name,
                     _id: user._id,
                     role: user.role,
-                    teamId: user.teamId
+                    teamId: user.teamId,
+                    department: user.department
                 }, process.env.REFRESH_TOKEN, { expiresIn: process.env.EXPIRE_RTOKEN });
                 res.cookie('jwt', refreshToken, {
                     httpOnly: true,
@@ -175,7 +178,8 @@ class Controller {
                 name: user.name,
                 _id: user._id,
                 role: user.role,
-                teamId: user.teamId
+                teamId: user.teamId,
+                department: user.department
             }, process.env.TOKEN, { expiresIn: process.env.EXPIRE_TOKEN });
             return res.header('Authorization', "Bearer " + token).json({
                 error: null,
@@ -202,6 +206,9 @@ class Controller {
                 }
                 if (req.query.role) {
                     query.role = req.query.role;
+                }
+                if (req.query.department) {
+                    query.department = req.query.department;
                 }
                 yield userModel.find(query).exec()
                     .then((response) => { return res.status(200).json(response); })
@@ -247,6 +254,7 @@ class Controller {
                 const user = yield new userModel({
                     name: req.body.name,
                     password: hashedPassword,
+                    department: req.body.department,
                     role: req.body.role,
                     teamId: req.user.teamId
                 });
@@ -325,6 +333,9 @@ class Controller {
                         else {
                             return res.status(400).json({ error: "Not valid role " });
                         }
+                        if (req.body.department) {
+                            user.department = req.body.department;
+                        }
                     }
                     else {
                         response.message = "Role is not an admin, role wasn't changed.";
@@ -395,7 +406,7 @@ class Controller {
             if (error) {
                 return res.status(401).json({ error: "Error in task creation check the error", description: error.details[0].message });
             }
-            if (req.user.role !== "admin" && req.user.role !== "supervisor") {
+            if (req.user.role !== "employee") {
                 return res.status(402).json({ Unauthorized: "Not authorized, only admin or supervisor can asign new tasks" });
             }
             let targetUser = yield userModel.find({ teamId: req.user.teamId, _id: req.body.userId }).exec();
@@ -407,6 +418,9 @@ class Controller {
             }
             if (targetUser[0].role == "supervisor" && targetUser[0]._id.toString() !== req.user._id && req.user.role !== "admin") {
                 return res.status(402).json({ error: "Cant assign tasks to other supervisors except self" });
+            }
+            if (targetUser[0].department !== req.user.department && req.user.role !== "admin") {
+                return res.status(402).json({ error: "Supervisors can only asign task to employees of the same department" });
             }
             if (req.user.role == "supervsior" && (req.body.roleType == "admin")) {
                 return res.status(402).json({ error: "A supervisor can't assign admn type role tasks" });
@@ -420,6 +434,7 @@ class Controller {
                     type: req.body.type,
                     roleType: targetUser[0].role,
                     description: req.body.description,
+                    department: req.body.department,
                     completion: false,
                     comment: req.body.comment
                 });
@@ -490,6 +505,9 @@ class Controller {
                 if (req.query.assignment) {
                     query.assignment = req.query.assignment;
                 }
+                if (req.query.department) {
+                    query.department = req.query.department;
+                }
                 try {
                     yield taskModel.find(query)
                         .then((response) => res.status(200).json(response))
@@ -539,6 +557,9 @@ class Controller {
                     if (req.body.userId) {
                         update.senderName = req.body.userId;
                     }
+                    if (req.body.department) {
+                        update.department = req.body.department;
+                    }
                 }
                 return update;
             }
@@ -549,9 +570,9 @@ class Controller {
                 return res.status(400).json({ error: "No Task Id provided (_id)" });
             }
             if (req.body._id.length !== 24 && req.query._id.length !== 24) {
-                return res.status(400).json({ error: "Bad task Id request" });
+                return res.status(400).json({ error: "Bad task id request" });
             }
-            if ((req.body.senderName || req.body.assignment || req.body.userId || req.body.roleType) && req.user.role !== "admin") {
+            if ((req.body.senderName || req.body.assignment || req.body.userId || req.body.roleType || req.body.department) && req.user.role !== "admin") {
                 return res.status(403).json({ forbidden: "Can't change sender, assign date, userId or roleType task" });
             }
             try {
@@ -588,10 +609,13 @@ class Controller {
             else if (req.user.role === "supervisor") {
                 const _id = new mongoose.Types.ObjectId(String(req.body._id));
                 let task = yield taskModel.findById(_id).exec();
+                if (task.department !== req.user.department) {
+                    return res.status(402).json({ error: "Employee task is not on the same department" });
+                }
                 if (!task || task === null || task === undefined) {
                     return res.status(404).json({ error: "Task not found" });
                 }
-                if (task.roleType === "employee" || (task.roleType === "supervisor" && task.userId === String(req.user._id))) {
+                if ((task.roleType === "employee" || (task.roleType === "supervisor" && task.userId === String(req.user._id)))) {
                     yield taskModel.deleteOne({ _id: _id, teamId: req.user.teamId })
                         .then((response) => res.status(200).json({ message: "Task deleted", response: response }))
                         .catch((error) => res.status(500).json({ error: error }));
@@ -612,8 +636,36 @@ class Controller {
             }
         });
     }
+    /**
+     * Only edit team name
+     * @param req _id,name
+     * @param res
+     */
     editTeam(req, res) {
         return __awaiter(this, void 0, void 0, function* () {
+            if (req.user.role !== "admin") {
+                return res.status(402).json({ error: "Only admin can change team name" });
+            }
+            if (req.user.department !== "direction") {
+                return res.status(402).json({ error: "Only admin in direction role can change team name" });
+            }
+            if (!req.body.name || req.body.name === null || req.body.name === undefined) {
+                return res.status(400).json({ error: "Team name not valid" });
+            }
+            try {
+                const team = yield TeamModel.findById(req.user.teamId);
+                if (team && team !== null && team !== undefined) {
+                    TeamModel.findOneAndUpdate({ _id: req.body.teamId, name: req.body.name });
+                    return res.status(201).json({ response: "Team name updated to: " + String(req.body.name) });
+                }
+                else {
+                    return res.status(404).json({ error: "Team not found" });
+                }
+            }
+            catch (error) {
+                console.log(error);
+                return res.status(500).json({ error: "Server Error", body: error });
+            }
         });
     }
 }

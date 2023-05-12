@@ -46,6 +46,10 @@ const taskSchema=new mongoose.Schema({
         min:0,
         max:255
     },
+    department:{
+        type:String,
+        required:true
+    },
     assignment:{
         type:Date,
         default:Date.now
