@@ -12,5 +12,6 @@ exports.taskJoi = joi_1.default.object({
     type: joi_1.default.string().min(4).required(),
     description: joi_1.default.string().min(4).max(500).required(),
     comment: joi_1.default.string(),
-    department: joi_1.default.string().min(4).max(25).required()
+    department: joi_1.default.string().min(2).max(25),
+    roleType: joi_1.default.string().min(2).max(25)
 });

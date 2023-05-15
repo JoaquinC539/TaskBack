@@ -70,8 +70,8 @@ export class Controller{
     }
     /**
      * 
-     * @param req name: User name, password: Password used to get access to the teeam, teamId: Id of a team to be linked the new team
-     * @param res json with new user containing name, hashed password, teamId and admin role by default
+     * @param req name: User name, password: Password used to get access to the team, teamId: Id of a team to be linked the new team
+     * @param res json with new user containing name, hashed password, teamId and admin and department "director" role by default
      * @returns status 200 or error and first admin user saved into the DB
      */
     async newAdminUser(req:any,res:any):Promise<any>{
@@ -122,7 +122,7 @@ export class Controller{
     /**
      * 
      * @param req name: User name already registered, password: access password created previously
-     * @param res Authorization token inside a json and a cookie with refresh token
+     * @param res Authorization token inside a json and a cookie with refresh token embedded name, role, department, teamId and _id
      * @returns json
      */
     async login(req:any,res:any):Promise<any>{
@@ -215,7 +215,7 @@ export class Controller{
    }
    /**
     * Create a new user of a team. Only can be created by someone with admin role. Team id is gotten from credentials
-    * @param req body: name, password and role token: role, teamId role values: "admin", "supervisor", "employee"
+    * @param req body: name, password, role and department role values: "admin", "supervisor", "employee", and any department set by the team
     * @param res json with the new user
     */
    async newUser(req:any,res:any):Promise<any>{
@@ -249,8 +249,8 @@ export class Controller{
     }
    }
    /**
-    * Updates user role, password, name and/or role, note: employee  and supervisor can't modify their role just admins. To modify name and password only can be done by the user itself
-    * @param req data of fields to be changed and user _id
+    * Updates user role, password, name and/or role, note: employee  and supervisor can't modify their role or department just admins. To modify name and password only can be done by the user itself
+    * @param req data of fields to be changed [name, password, role, department] and user _id
     * @param res json with new data (hashed password)
     */
    async editUser(req:any,res:any):Promise<any>{
@@ -259,18 +259,18 @@ export class Controller{
     try {
         let personalUpdate:boolean=false;
         let roleUpdate:boolean=false;
+        if(req.body.teamId){return res.status(402).json({error:"Not allowed to change a user teamId"})}
         if(!req.body._id ){return res.status(400).json({error:"Not id provided "})}
         if(req.body._id.length!==24){return res.status(400).json({error:"Bad id provided"})}
-        if(typeof req.body._id !=="string"){return res.status(400).json({error:"Bad request"})}
-        if(req.body._id) 
+        if(typeof req.body._id !=="string"){return res.status(400).json({error:"Bad request"})} 
         if(req.body._id && req.user._id==req.body._id){personalUpdate=true}
         if(req.user.role==="admin"){roleUpdate=true}
-        if(!personalUpdate && req.body.name || !personalUpdate && req.body.password){return res.status(401).json({Unauthorized:"Not allowed to edit names and personal information of others"})}
-        if(!roleUpdate && req.body.role){return res.status(401).json({Unauthorized:"Not allowed to modify your or others roles. Ask and admin to do that"})}
+        if(!personalUpdate && req.body.name || !personalUpdate && req.body.password){return res.status(403).json({Unauthorized:"Not allowed to edit names and personal information of others"})}
+        if(!roleUpdate && (req.body.role || req.body.department)){return res.status(403).json({Unauthorized:"Not allowed to modify your or others roles or departments. Ask and admin to do that"})}
         const targetId=await new mongoose.Types.ObjectId(String(req.body._id));
         const userQuery=await userModel.find({_id:targetId,teamId:req.user.teamId});
-        if(!userQuery || userQuery===null || userQuery===undefined){return res.status(404).json({error:"User not found"})}
-        if(userQuery.teamId!==req.user.teamId){return res.status(402).json({forbidden:"Not allowed to modified another teams"})}
+        if(!userQuery || userQuery===null || userQuery===undefined || !userQuery.length){return res.status(404).json({error:"User not found"})}
+        if(userQuery[0].teamId!==req.user.teamId){return res.status(403).json({error:"Not allowed to modified another teams"})}
         let user=await {} as User;
         let response=await {} as Error;
         response.message=null;
@@ -282,20 +282,16 @@ export class Controller{
             const hashedPassword=await bcrypt.hash(String(req.body.password),salt);
             user.password=hashedPassword; 
         }
-         if(roleUpdate && req.body.role){
-            if(req.user.role==="admin" ){
+         if(roleUpdate && (req.body.role || req.body.department)){
+            
                 
                 if((req.body.role=="admin" || req.body.role=="supervisor" || req.body.role=="employee")){
                     user.role=req.body.role;
-
-                }else{
-                    return res.status(400).json({error:"Not valid role "})
-                }
-                if(req.body.department){
-                    user.department=req.body.department;
-                }
+                }            
+            if(req.body.department){
+                user.department=req.body.department;
             }
-            else{response.message="Role is not an admin, role wasn't changed."}
+            
          }
          
           await userModel.findOneAndUpdate( {_id:targetId},user);
@@ -308,29 +304,35 @@ export class Controller{
    }
    /**
     * Delete one user, only admin role can perform this action
-    * @param req _id:24 length string
+    * @param req _id:24 length string body form/json or query ?_id={id}
     * @param res error or status 200 operation
     * @returns void
     */
    async deleteUser(req:any,res:any):Promise<any>{
     try {
-        
-        if(!req.body ||!req.body._id || req.body._id===null || req.body._id===undefined){return res.status(400).json({error:"Not id provided or error in request"})}
+        let targetId:string;
+        if(!req.body._id ||!req.body._id || req.body._id===null || req.body._id===undefined){
+            if(!req.query._id || req.query._id===null || req.query._id===undefined){
+                return res.status(400).json({error:"Not id provided or error in request"})}else{
+                    targetId=req.query._id;
+                }
+            }else{
+                targetId=req.body._id; 
+            }
         if(req.user.role!=="admin"){return res.status(402).json({Unauthorized:"Just an admin role can perform this action"})}
-        if(req.body._id.length!==24){return res.status(401).json({Error:"Error in id or not valid"})}
-        let targetId:any
-        let validId:any=await mongoose.Types.ObjectId.isValid(req.body._id)
+        if(targetId.length!=24 || !targetId){return res.status(400).json({Error:"Error in id or not valid"})}
+        
+        let validId:any=await mongoose.Types.ObjectId.isValid(targetId)
         if(validId){
-            console.log(mongoose.Types.ObjectId.isValid(req.body._id))
-            targetId=req.body._id
+            targetId=req.body._id?req.body._id:req.query._id;
         }else{
             targetId=await new mongoose.Types.ObjectId(String(req.body._id));
         }
         const userToDelete:any=await userModel.find({_id:targetId,teamId:req.user.teamId});
-        if(!userToDelete || userToDelete===null || userToDelete===undefined){return res.status(200).json({error:"User to delete not found"})}
-        if(userToDelete.teamId!==req.user.teamId){return res.status(401).json({Unauthorized:"Can't modify other teams"})}
+        if(!userToDelete || userToDelete===null || userToDelete===undefined || !userToDelete.length){return res.status(200).json({error:"User to delete not found"})}
+        if(userToDelete[0].teamId!==req.user.teamId){return res.status(401).json({Unauthorized:"Can't modify other teams"})}
         await userModel.deleteOne({_id:targetId})
-        .then((response:any)=>{console.log(response)})
+        .then((response:any)=>{})
         .catch((error:any)=>console.log(error));
         return res.status(200).json({message:"Operation succesful"});
 
@@ -342,20 +344,35 @@ export class Controller{
 
    } 
    /**
-    * Add as new task to somebody, admin can assign tasks to himself and other admins, supervisor and employees. Supervisor can assugn task to himelf and employees. Employees can't
-    * @param req title, userId, type, description, roleType and optional comment
-    * @param res 
+    * Assign new task to somebody, admin can assign tasks to himself and other admins, supervisors and employees. Supervisor can assign task to himself and employees of same department. Employees can't.
+    * Supervisors can only assign their own department tasks, while, admins can assign to any department. 
+    * @param req title, userId, type, description, department (optional, will be user asgined department by default) only admins, roleType (optional, will be user asigned role by default) only admins, and optional comment
+    * @param res saved new task with assigned role of the selected user of the task.
     */   
    async newTask(req:any,res:any):Promise<any>{
     const {error}=taskJoi.validate(req.body);
     if(error){return res.status(401).json({error:"Error in task creation check the error",description:error.details[0].message})}
-    if(req.user.role!=="employee"){return res.status(402).json({Unauthorized:"Not authorized, only admin or supervisor can asign new tasks"});}
+    if(req.user.role==="employee"){return res.status(401).json({Unauthorized:"Not authorized, only admins or supervisors can asign new tasks"});}
     let targetUser=await userModel.find({teamId:req.user.teamId,_id:req.body.userId}).exec();
     if(!targetUser || targetUser==null || targetUser==undefined || !targetUser.length){return res.status(404).json({error:"Employee not found"});}
     if(targetUser[0].role=="admin" && req.user.role!=="admin"){return res.status(402).json({error:"Only admin can assign task to admin"});}
     if(targetUser[0].role=="supervisor" && targetUser[0]._id.toString()!==req.user._id && req.user.role!=="admin"){return res.status(402).json({error:"Cant assign tasks to other supervisors except self"}) }
     if(targetUser[0].department!==req.user.department && req.user.role!=="admin"){return res.status(402).json({error:"Supervisors can only asign task to employees of the same department"})}
-    if(req.user.role=="supervsior" && (req.body.roleType=="admin" )){return res.status(402).json({error:"A supervisor can't assign admn type role tasks"})}
+    if(req.user.role==="supervsior" && (req.body.roleType==="admin" )){return res.status(402).json({error:"A supervisor can't assign admin type role tasks"})}
+    let department:string=targetUser[0].department;
+    let roleType:string=targetUser[0].role;
+    if(req.user.role==="admin" && (req.body.roleType || req.body.department)){
+        if(req.body.department){department=req.body.department}
+        if(req.body.roleType){
+            if(req.body.roleType!=="admin" || req.body.roleType!=="supervisor" || req.body.roleType!=="employee"){
+                return res.status(404).json({error:"Role type not valid. Valid role types: admin, supervisor and employee"});
+            }
+            roleType=req.body.roleType}
+    }else if(req.user.role!=="admin" && (req.body.roleType || req.body.department)){
+        return res.status(401).json({error:"Only admins can assign a different department or role type task"
+            })}
+
+
     try {
         const task=new taskModel({
             teamId:req.user.teamId,
@@ -363,9 +380,9 @@ export class Controller{
             senderName:req.user.name,
             userId:req.body.userId,
             type:req.body.type,
-            roleType:targetUser[0].role,
+            roleType:roleType,
             description:req.body.description,
-            department:req.body.department,
+            department:department,
             completion:false,
             comment:req.body.comment
          });
@@ -379,7 +396,7 @@ export class Controller{
    }
    /**
     * Query task from the DB using role permissions, employees can only retreat their own taks, supervisor can see employees and self tasks, admins can query all the data from every person in the team
-    * @param req query params: multiple userId, _id,name,title, completion,senderName,comment,type,assignment
+    * @param req query params: multiple userId, _id,name,title, completion,senderName,comment,type,assignment and department
     * @param res query data or error if not authorized or according data
     * 
     */
@@ -392,7 +409,7 @@ export class Controller{
             query.userId=req.user._id;
         }
         if(req.user.role==="supervisor"){
-            let queriedEmployee=await userModel.find({teamId:req.user.teamId,role:"employee"}).exec();
+            let queriedEmployee=await userModel.find({teamId:req.user.teamId,role:"employee",department:req.user.department}).exec();
             const employeesIds=queriedEmployee.map((employee:any)=>employee._id.toString());
             employeesIds.push(req.user._id.toString());
             
@@ -461,7 +478,7 @@ export class Controller{
     }
    }/**
     * Edit a Task, credentials role not required to edit a task
-    * @param req _id task id, and/or title, type, description, completion, and comment || Can't be updated:  teamId, senderName, req.body.assignment, userId, RoleType (Admin exception).
+    * @param req _id task id, and/or title, type, description, completion, and comment || Can't be updated:  teamId, senderName, assignment (date), userId, roleType and department (Admin exception).
     * @param res success or error json
     */
    async updateTask(req:any,res:any){
@@ -519,7 +536,7 @@ export class Controller{
    /**
     * Delete a task according to parameters and role.
     * Admin can delete every task without restriction under the same team.
-    * Supervisor can only delete it's own tasks asigned by itself or admins and employees
+    * Supervisor can only delete it's own tasks asigned by itself or admins and employees asigned to their own department
     * Employees can't delete any task
     * @param req _id
     * @param res success message or error

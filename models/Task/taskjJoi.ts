@@ -6,5 +6,6 @@ export const taskJoi=Joi.object({
     type:Joi.string().min(4).required(),
     description:Joi.string().min(4).max(500).required(),
     comment:Joi.string(),
-    department:Joi.string().min(4).max(25).required()
+    department:Joi.string().min(2).max(25),
+    roleType:Joi.string().min(2).max(25)
 });
