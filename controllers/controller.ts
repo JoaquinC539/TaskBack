@@ -38,7 +38,7 @@ type Task={
     comment:string,
     assignment:string,
     teamId:string,
-    department:string
+    department:any
 }
 export class Controller{
 
@@ -259,7 +259,7 @@ export class Controller{
     try {
         let personalUpdate:boolean=false;
         let roleUpdate:boolean=false;
-        if(req.body.teamId){return res.status(402).json({error:"Not allowed to change a user teamId"})}
+        if(req.body.teamId){return res.status(403).json({error:"Not allowed to change a user teamId"})}
         if(!req.body._id ){return res.status(400).json({error:"Not id provided "})}
         if(req.body._id.length!==24){return res.status(400).json({error:"Bad id provided"})}
         if(typeof req.body._id !=="string"){return res.status(400).json({error:"Bad request"})} 
@@ -319,7 +319,7 @@ export class Controller{
             }else{
                 targetId=req.body._id; 
             }
-        if(req.user.role!=="admin"){return res.status(402).json({Unauthorized:"Just an admin role can perform this action"})}
+        if(req.user.role!=="admin"){return res.status(401).json({Unauthorized:"Just an admin role can perform this action"})}
         if(targetId.length!=24 || !targetId){return res.status(400).json({Error:"Error in id or not valid"})}
         
         let validId:any=await mongoose.Types.ObjectId.isValid(targetId)
@@ -334,7 +334,7 @@ export class Controller{
         await userModel.deleteOne({_id:targetId})
         .then((response:any)=>{})
         .catch((error:any)=>console.log(error));
-        return res.status(200).json({message:"Operation succesful"});
+        return res.status(200).json({message:true});
 
        
     } catch (error) {
@@ -355,10 +355,10 @@ export class Controller{
     if(req.user.role==="employee"){return res.status(401).json({Unauthorized:"Not authorized, only admins or supervisors can asign new tasks"});}
     let targetUser=await userModel.find({teamId:req.user.teamId,_id:req.body.userId}).exec();
     if(!targetUser || targetUser==null || targetUser==undefined || !targetUser.length){return res.status(404).json({error:"Employee not found"});}
-    if(targetUser[0].role=="admin" && req.user.role!=="admin"){return res.status(402).json({error:"Only admin can assign task to admin"});}
-    if(targetUser[0].role=="supervisor" && targetUser[0]._id.toString()!==req.user._id && req.user.role!=="admin"){return res.status(402).json({error:"Cant assign tasks to other supervisors except self"}) }
-    if(targetUser[0].department!==req.user.department && req.user.role!=="admin"){return res.status(402).json({error:"Supervisors can only asign task to employees of the same department"})}
-    if(req.user.role==="supervsior" && (req.body.roleType==="admin" )){return res.status(402).json({error:"A supervisor can't assign admin type role tasks"})}
+    if(targetUser[0].role=="admin" && req.user.role!=="admin"){return res.status(401).json({error:"Only admin can assign task to admin"});}
+    if(targetUser[0].role=="supervisor" && targetUser[0]._id.toString()!==req.user._id && req.user.role!=="admin"){return res.status(401).json({error:"Cant assign tasks to other supervisors except self"}) }
+    if(targetUser[0].department!==req.user.department && req.user.role!=="admin"){return res.status(401).json({error:"Supervisors can only asign task to employees of the same department"})}
+    if(req.user.role==="supervsior" && (req.body.roleType==="admin" )){return res.status(401).json({error:"A supervisor can't assign admin type role tasks"})}
     let department:string=targetUser[0].department;
     let roleType:string=targetUser[0].role;
     if(req.user.role==="admin" && (req.body.roleType || req.body.department)){
@@ -419,9 +419,8 @@ export class Controller{
                     query.userId={$in:queryUserIds};
                 }else{return res.status(404).json({error:"Employee not found or higher hierarchy tasks not allowed to retreat"})}
             }else{
-               query.userId={$in:employeesIds}
-            
-               
+               query.userId={$in:employeesIds}          
+                query.department=req.user.department;
             }
         }
 
@@ -431,6 +430,10 @@ export class Controller{
                 let queryUserIds:string[]=(req.query.userId.split(","));
                 query.userId={$in:queryUserIds};                
             }
+            if(req.query.department){
+                let queryDepartments:string[]=req.query.department.split(",");
+                query.department={$in:queryDepartments};
+              }
         }
  
         if(req.query.title){
@@ -460,9 +463,7 @@ export class Controller{
           if(req.query.assignment){
             query.assignment = req.query.assignment;
           }
-          if(req.query.department){
-            query.department=req.query.department;
-          }
+
 
           try {
             await taskModel.find(query)
@@ -476,29 +477,38 @@ export class Controller{
         console.log(error);
         return res.status(500).json(error);
     }
-   }/**
+   }
+   /**
     * Edit a Task, credentials role not required to edit a task
-    * @param req _id task id, and/or title, type, description, completion, and comment || Can't be updated:  teamId, senderName, assignment (date), userId, roleType and department (Admin exception).
+    * @param req _id task id, and/or title, type, description, completion, and comment || Can't be updated: senderName, assignment (date), userId, roleType and department (Admin exception). Frobidden for any role :teamId
     * @param res success or error json
     */
    async updateTask(req:any,res:any){
         function buildObject(role:string="employee"){
             let update={} as Task;
 
-            if (req.body.title) {
-            update.title = req.body.title;
+            if(role==="employee"||role==="admin"||role==="supervisor"){
+                if (req.body.comment) {
+                    update.comment = req.body.comment;
+                    }
+                    if (req.body.completion) {
+                        update.completion = req.body.completion;
+                        }
             }
-            if (req.body.type) {
-            update.type = req.body.type;
-            }
-            if (req.body.description) {
-            update.description = req.body.description;
-            }
-            if (req.body.completion) {
-            update.completion = req.body.completion;
-            }
-            if (req.body.comment) {
-            update.comment = req.body.comment;
+            if(role==="supervisor"||role==="admin"){
+                if (req.body.title) {
+                    update.title = req.body.title;
+                    }
+                    if (req.body.type) {
+                    update.type = req.body.type;
+                    }
+                    if (req.body.description) {
+                    update.description = req.body.description;
+                    }
+
+                    if(req.body.userId){
+                        update.senderName=req.body.userId;
+                    }
             }
             if(role==="admin"){
                 if(req.body.roleType){
@@ -507,9 +517,7 @@ export class Controller{
                 if(req.body.senderName){
                     update.senderName=req.body.senderName;
                 }
-                if(req.body.userId){
-                    update.senderName=req.body.userId;
-                }
+
                 if(req.body.department){
                     update.department=req.body.department;
                 }
@@ -522,11 +530,12 @@ export class Controller{
     if(req.body._id.length!==24 && req.query._id.length!==24){
         return res.status(400).json({error:"Bad task id request"});
     }
-    if((req.body.senderName || req.body.assignment || req.body.userId || req.body.roleType || req.body.department) && req.user.role!=="admin"){return res.status(403).json({forbidden:"Can't change sender, assign date, userId or roleType task"})}         try {
+    if((req.body.senderName || req.body.assignment  || req.body.roleType || req.body.department) && req.user.role!=="admin"){return res.status(403).json({forbidden:"Can't change sender, assign date or roleType task"})}         try {
 
                 const taskId=await new mongoose.Types.ObjectId(String(req.body._id));               
                 const employeeTask=await taskModel.find({_id:req.body._id,teamId:req.user.teamId});
                 if(!employeeTask||employeeTask==null || employeeTask===undefined){return res.status(404).json({error:"Task not found"})}
+                if(employeeTask[0].department!==req.user.department && (req.user.role==="supervisor" || req.user.role==="employee")){return res.status(401).json({error:"Not allowed to change task department"})}
                 await taskModel.findOneAndUpdate({_id:taskId,teamId:req.user.teamId},buildObject(req.user.role)).exec();                      
                 return await res.json({update:"success"});
         } catch (error) {
@@ -535,44 +544,44 @@ export class Controller{
    }
    /**
     * Delete a task according to parameters and role.
-    * Admin can delete every task without restriction under the same team.
-    * Supervisor can only delete it's own tasks asigned by itself or admins and employees asigned to their own department
+    * Admin can delete every task without restriction under the same team and department.
+    * Supervisor can only delete it's own tasks asigned by itself  and employees asigned to their own department
     * Employees can't delete any task
-    * @param req _id
+    * @param req body: _id
     * @param res success message or error
     *  
     */
    async deleteTask(req:any,res:any):Promise<any>{
-    if((!req.body._id || req.body._id.length!==24) && typeof req.body._id!=="string"){res.status(402).json({})}
-    if(req.user.role==="employee"){res.status(402).json({error:"Not authorized to perform this action"});}
+    if((!req.body._id || req.body._id.length!==24) && typeof req.body._id!=="string"){res.status(400).json({error:"Not valid _id or _id not provided"})}
+    if(req.user.role==="employee"){res.status(401).json({error:"Not authorized to perform this action"});}
     else if(req.user.role==="supervisor"){
         const _id=new mongoose.Types.ObjectId(String(req.body._id));
         let task=await taskModel.findById(_id).exec();
-        if(task.department!==req.user.department){return res.status(402).json({error:"Employee task is not on the same department"});}
+        if(task.department!==req.user.department){return res.status(401).json({error:"Employee task is not on the same department"});}
         if(!task || task===null || task===undefined){return res.status(404).json({error:"Task not found"})}
         if((task.roleType==="employee" || (task.roleType==="supervisor" && task.userId===String(req.user._id)))){
            await taskModel.deleteOne({_id:_id,teamId:req.user.teamId})
-           .then((response:Response)=>res.status(200).json({message:"Task deleted",response:response}))
+           .then((response:Response)=>res.status(200).json({status:true,response:response}))
            .catch((error:Error)=>res.status(500).json({error:error}));
-        }else{return res.status(402).json({error:"Not allowed to modify other supervisors or admin tasks"});}
+        }else{return res.status(401).json({error:"Not allowed to modify other supervisors or admin tasks"});}
     }
     else if(req.user.role==="admin"){
         const _id=new mongoose.Types.ObjectId(String(req.body._id));
         let task=await taskModel.findById(_id).exec();
         if(!task || task===null || task===undefined){return res.status(404).json({error:"Task not found"})}
         await taskModel.deleteOne({_id:_id,teamId:req.user.teamId})
-        .then((response:Response)=>res.status(200).json({message:"Task deleted",response:response}))
+        .then((response:Response)=>res.status(200).json({status:true,response:response}))
         .catch((error:Error)=>res.status(500).json({error:error}));
     }
    }
    /**
-    * Only edit team name
+    * Edit team name, can be perfomeed only by admins in direction role
     * @param req _id,name
     * @param res 
     */
    async editTeam(req:any,res:any){
-    if(req.user.role!=="admin"){return res.status(402).json({error:"Only admin can change team name"})}
-    if(req.user.department!=="direction"){return res.status(402).json({error:"Only admin in direction role can change team name"})}
+    if(req.user.role!=="admin"){return res.status(403).json({error:"Only admin can change team name"})}
+    if(req.user.department!=="direction"){return res.status(403).json({error:"Only admin in direction department can change team name"})}
     if(!req.body.name || req.body.name===null || req.body.name===undefined){return res.status(400).json({error:"Team name not valid"})}
     try {
         const team=await TeamModel.findById(req.user.teamId);
@@ -587,14 +596,20 @@ export class Controller{
         return res.status(500).json({error:"Server Error",body:error});
     }
     }
+    /**
+     * Delete a TEAM, TASKS and USERS of the team
+     * @param req _id
+     * @param res 
+     * @returns 
+     */
     async deleteTeam(req:any,res:any){
-        if(req.user.role!=="admin" && req.user.department!=="direction"){return res.status(402).json({error:"Not allowed to delete a team"})}
+        if(req.user.role!=="admin" && req.user.department!=="direction"){return res.status(403).json({error:"Not allowed to delete a team"})}
         let team=await TeamModel.findById(req.user.teamId);
         if(!team || team===null || team===undefined){return res.status(404).json({error:"Team not found"})}
         await taskModel.deleteMany({teamId:req.user.teamId});
         await userModel.deleteMany({teamId:req.user.teamId});
         await TeamModel.deleteOne({_id:req.user.teamId});
-        return res.status(201).json({message:"Team. task and users were deleted"});
+        return res.status(201).json({status:true,message:"Team. task and users were deleted"});
     }
 
 

@@ -19,12 +19,12 @@ class Router {
         this.routes.post('/user', tokenVerify, controller.newUser); //Correct
         this.routes.put('/user', tokenVerify, controller.editUser); //Correct
         this.routes.delete('/user', tokenVerify, controller.deleteUser); //Correct;
-        this.routes.post('/task', tokenVerify, controller.newTask);
-        this.routes.get('/task', tokenVerify, controller.getTasks);
-        this.routes.put('/task', tokenVerify, controller.updateTask);
-        this.routes.delete('/task', tokenVerify, controller.deleteTask);
-        this.routes.put('/team', tokenVerify, controller.editTeam);
-        this.routes.delete('/team', tokenVerify, controller.deleteTeam);
+        this.routes.post('/task', tokenVerify, controller.newTask); //Correct;
+        this.routes.get('/task', tokenVerify, controller.getTasks); //Correct
+        this.routes.put('/task', tokenVerify, controller.updateTask); //Correct
+        this.routes.delete('/task', tokenVerify, controller.deleteTask); //Correct
+        this.routes.put('/team', tokenVerify, controller.editTeam); //Correct
+        this.routes.delete('/team', tokenVerify, controller.deleteTeam); //Correct
     }
 }
 exports.Router = Router;

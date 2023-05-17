@@ -285,7 +285,7 @@ class Controller {
                 let personalUpdate = false;
                 let roleUpdate = false;
                 if (req.body.teamId) {
-                    return res.status(402).json({ error: "Not allowed to change a user teamId" });
+                    return res.status(403).json({ error: "Not allowed to change a user teamId" });
                 }
                 if (!req.body._id) {
                     return res.status(400).json({ error: "Not id provided " });
@@ -366,7 +366,7 @@ class Controller {
                     targetId = req.body._id;
                 }
                 if (req.user.role !== "admin") {
-                    return res.status(402).json({ Unauthorized: "Just an admin role can perform this action" });
+                    return res.status(401).json({ Unauthorized: "Just an admin role can perform this action" });
                 }
                 if (targetId.length != 24 || !targetId) {
                     return res.status(400).json({ Error: "Error in id or not valid" });
@@ -388,7 +388,7 @@ class Controller {
                 yield userModel.deleteOne({ _id: targetId })
                     .then((response) => { })
                     .catch((error) => console.log(error));
-                return res.status(200).json({ message: "Operation succesful" });
+                return res.status(200).json({ message: true });
             }
             catch (error) {
                 console.log(error);
@@ -416,16 +416,16 @@ class Controller {
                 return res.status(404).json({ error: "Employee not found" });
             }
             if (targetUser[0].role == "admin" && req.user.role !== "admin") {
-                return res.status(402).json({ error: "Only admin can assign task to admin" });
+                return res.status(401).json({ error: "Only admin can assign task to admin" });
             }
             if (targetUser[0].role == "supervisor" && targetUser[0]._id.toString() !== req.user._id && req.user.role !== "admin") {
-                return res.status(402).json({ error: "Cant assign tasks to other supervisors except self" });
+                return res.status(401).json({ error: "Cant assign tasks to other supervisors except self" });
             }
             if (targetUser[0].department !== req.user.department && req.user.role !== "admin") {
-                return res.status(402).json({ error: "Supervisors can only asign task to employees of the same department" });
+                return res.status(401).json({ error: "Supervisors can only asign task to employees of the same department" });
             }
             if (req.user.role === "supervsior" && (req.body.roleType === "admin")) {
-                return res.status(402).json({ error: "A supervisor can't assign admin type role tasks" });
+                return res.status(401).json({ error: "A supervisor can't assign admin type role tasks" });
             }
             let department = targetUser[0].department;
             let roleType = targetUser[0].role;
@@ -495,12 +495,17 @@ class Controller {
                     }
                     else {
                         query.userId = { $in: employeesIds };
+                        query.department = req.user.department;
                     }
                 }
                 if (req.user.role === "admin") {
                     if (req.query.userId) {
                         let queryUserIds = (req.query.userId.split(","));
                         query.userId = { $in: queryUserIds };
+                    }
+                    if (req.query.department) {
+                        let queryDepartments = req.query.department.split(",");
+                        query.department = { $in: queryDepartments };
                     }
                 }
                 if (req.query.title) {
@@ -524,9 +529,6 @@ class Controller {
                 if (req.query.assignment) {
                     query.assignment = req.query.assignment;
                 }
-                if (req.query.department) {
-                    query.department = req.query.department;
-                }
                 try {
                     yield taskModel.find(query)
                         .then((response) => res.status(200).json(response))
@@ -542,29 +544,37 @@ class Controller {
                 return res.status(500).json(error);
             }
         });
-    } /**
+    }
+    /**
      * Edit a Task, credentials role not required to edit a task
-     * @param req _id task id, and/or title, type, description, completion, and comment || Can't be updated:  teamId, senderName, assignment (date), userId, roleType and department (Admin exception).
+     * @param req _id task id, and/or title, type, description, completion, and comment || Can't be updated: senderName, assignment (date), userId, roleType and department (Admin exception). Frobidden for any role :teamId
      * @param res success or error json
      */
     updateTask(req, res) {
         return __awaiter(this, void 0, void 0, function* () {
             function buildObject(role = "employee") {
                 let update = {};
-                if (req.body.title) {
-                    update.title = req.body.title;
+                if (role === "employee" || role === "admin" || role === "supervisor") {
+                    if (req.body.comment) {
+                        update.comment = req.body.comment;
+                    }
+                    if (req.body.completion) {
+                        update.completion = req.body.completion;
+                    }
                 }
-                if (req.body.type) {
-                    update.type = req.body.type;
-                }
-                if (req.body.description) {
-                    update.description = req.body.description;
-                }
-                if (req.body.completion) {
-                    update.completion = req.body.completion;
-                }
-                if (req.body.comment) {
-                    update.comment = req.body.comment;
+                if (role === "supervisor" || role === "admin") {
+                    if (req.body.title) {
+                        update.title = req.body.title;
+                    }
+                    if (req.body.type) {
+                        update.type = req.body.type;
+                    }
+                    if (req.body.description) {
+                        update.description = req.body.description;
+                    }
+                    if (req.body.userId) {
+                        update.senderName = req.body.userId;
+                    }
                 }
                 if (role === "admin") {
                     if (req.body.roleType) {
@@ -572,9 +582,6 @@ class Controller {
                     }
                     if (req.body.senderName) {
                         update.senderName = req.body.senderName;
-                    }
-                    if (req.body.userId) {
-                        update.senderName = req.body.userId;
                     }
                     if (req.body.department) {
                         update.department = req.body.department;
@@ -591,14 +598,17 @@ class Controller {
             if (req.body._id.length !== 24 && req.query._id.length !== 24) {
                 return res.status(400).json({ error: "Bad task id request" });
             }
-            if ((req.body.senderName || req.body.assignment || req.body.userId || req.body.roleType || req.body.department) && req.user.role !== "admin") {
-                return res.status(403).json({ forbidden: "Can't change sender, assign date, userId or roleType task" });
+            if ((req.body.senderName || req.body.assignment || req.body.roleType || req.body.department) && req.user.role !== "admin") {
+                return res.status(403).json({ forbidden: "Can't change sender, assign date or roleType task" });
             }
             try {
                 const taskId = yield new mongoose.Types.ObjectId(String(req.body._id));
                 const employeeTask = yield taskModel.find({ _id: req.body._id, teamId: req.user.teamId });
                 if (!employeeTask || employeeTask == null || employeeTask === undefined) {
                     return res.status(404).json({ error: "Task not found" });
+                }
+                if (employeeTask[0].department !== req.user.department && (req.user.role === "supervisor" || req.user.role === "employee")) {
+                    return res.status(401).json({ error: "Not allowed to change task department" });
                 }
                 yield taskModel.findOneAndUpdate({ _id: taskId, teamId: req.user.teamId }, buildObject(req.user.role)).exec();
                 return yield res.json({ update: "success" });
@@ -610,37 +620,37 @@ class Controller {
     }
     /**
      * Delete a task according to parameters and role.
-     * Admin can delete every task without restriction under the same team.
-     * Supervisor can only delete it's own tasks asigned by itself or admins and employees asigned to their own department
+     * Admin can delete every task without restriction under the same team and department.
+     * Supervisor can only delete it's own tasks asigned by itself  and employees asigned to their own department
      * Employees can't delete any task
-     * @param req _id
+     * @param req body: _id
      * @param res success message or error
      *
      */
     deleteTask(req, res) {
         return __awaiter(this, void 0, void 0, function* () {
             if ((!req.body._id || req.body._id.length !== 24) && typeof req.body._id !== "string") {
-                res.status(402).json({});
+                res.status(400).json({ error: "Not valid _id or _id not provided" });
             }
             if (req.user.role === "employee") {
-                res.status(402).json({ error: "Not authorized to perform this action" });
+                res.status(401).json({ error: "Not authorized to perform this action" });
             }
             else if (req.user.role === "supervisor") {
                 const _id = new mongoose.Types.ObjectId(String(req.body._id));
                 let task = yield taskModel.findById(_id).exec();
                 if (task.department !== req.user.department) {
-                    return res.status(402).json({ error: "Employee task is not on the same department" });
+                    return res.status(401).json({ error: "Employee task is not on the same department" });
                 }
                 if (!task || task === null || task === undefined) {
                     return res.status(404).json({ error: "Task not found" });
                 }
                 if ((task.roleType === "employee" || (task.roleType === "supervisor" && task.userId === String(req.user._id)))) {
                     yield taskModel.deleteOne({ _id: _id, teamId: req.user.teamId })
-                        .then((response) => res.status(200).json({ message: "Task deleted", response: response }))
+                        .then((response) => res.status(200).json({ status: true, response: response }))
                         .catch((error) => res.status(500).json({ error: error }));
                 }
                 else {
-                    return res.status(402).json({ error: "Not allowed to modify other supervisors or admin tasks" });
+                    return res.status(401).json({ error: "Not allowed to modify other supervisors or admin tasks" });
                 }
             }
             else if (req.user.role === "admin") {
@@ -650,23 +660,23 @@ class Controller {
                     return res.status(404).json({ error: "Task not found" });
                 }
                 yield taskModel.deleteOne({ _id: _id, teamId: req.user.teamId })
-                    .then((response) => res.status(200).json({ message: "Task deleted", response: response }))
+                    .then((response) => res.status(200).json({ status: true, response: response }))
                     .catch((error) => res.status(500).json({ error: error }));
             }
         });
     }
     /**
-     * Only edit team name
+     * Edit team name, can be perfomeed only by admins in direction role
      * @param req _id,name
      * @param res
      */
     editTeam(req, res) {
         return __awaiter(this, void 0, void 0, function* () {
             if (req.user.role !== "admin") {
-                return res.status(402).json({ error: "Only admin can change team name" });
+                return res.status(403).json({ error: "Only admin can change team name" });
             }
             if (req.user.department !== "direction") {
-                return res.status(402).json({ error: "Only admin in direction role can change team name" });
+                return res.status(403).json({ error: "Only admin in direction department can change team name" });
             }
             if (!req.body.name || req.body.name === null || req.body.name === undefined) {
                 return res.status(400).json({ error: "Team name not valid" });
@@ -687,10 +697,16 @@ class Controller {
             }
         });
     }
+    /**
+     * Delete a TEAM, TASKS and USERS of the team
+     * @param req _id
+     * @param res
+     * @returns
+     */
     deleteTeam(req, res) {
         return __awaiter(this, void 0, void 0, function* () {
             if (req.user.role !== "admin" && req.user.department !== "direction") {
-                return res.status(402).json({ error: "Not allowed to delete a team" });
+                return res.status(403).json({ error: "Not allowed to delete a team" });
             }
             let team = yield TeamModel.findById(req.user.teamId);
             if (!team || team === null || team === undefined) {
@@ -699,7 +715,7 @@ class Controller {
             yield taskModel.deleteMany({ teamId: req.user.teamId });
             yield userModel.deleteMany({ teamId: req.user.teamId });
             yield TeamModel.deleteOne({ _id: req.user.teamId });
-            return res.status(201).json({ message: "Team. task and users were deleted" });
+            return res.status(201).json({ status: true, message: "Team. task and users were deleted" });
         });
     }
 }
