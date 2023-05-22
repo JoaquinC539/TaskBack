@@ -1,17 +1,27 @@
+import { string } from 'joi';
 import mongoose from 'mongoose';
 
 
 
 const taskSchema=new mongoose.Schema({
-    name:{
+    title:{
         type:String,
         required:true,
         min:5,
         max:50
     },
-    userID:{
-        type:Number,
+    senderName:{
+        type:String,
         required:true
+    },
+    userId:{
+        type:String,
+        required:true
+    },
+    roleType:{
+        type:String,
+        required:true,
+        
     },
     type:{
         type:String,
@@ -36,10 +46,19 @@ const taskSchema=new mongoose.Schema({
         min:0,
         max:255
     },
+    department:{
+        type:String,
+        required:true
+    },
     assignment:{
         type:Date,
         default:Date.now
-    }
+    },
+    teamId:{
+        type:String,
+        required:true
+    },
+    
 
 });
 

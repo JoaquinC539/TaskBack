@@ -21,6 +21,10 @@ const userSchema = new mongoose_1.default.Schema({
         type: String,
         required: true,
     },
+    department: {
+        type: String,
+        required: true
+    },
     role: {
         type: String,
         required: true

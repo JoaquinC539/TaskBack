@@ -10,14 +10,21 @@ class Router {
     constructor() {
         this.routes = express.Router();
         this.routes.get('', controller.view);
-        this.routes.post('/team', controller.newTeam);
-        this.routes.post('/admin', controller.newAdminUser);
-        this.routes.get('/team/:id', controller.getTeam);
-        this.routes.post('/login', controller.login);
-        this.routes.get('/jwtTest', tokenVerify, controller.protectedMethod);
-        this.routes.get('/refresh', refreshTokenVerify, controller.refreshToken);
-        this.routes.get('/user', tokenVerify, controller.getUser);
-        this.routes.post('/user', tokenVerify, controller.newUser);
+        this.routes.post('/team', controller.newTeam); //Correct
+        this.routes.post('/admin', controller.newAdminUser); //Correct
+        this.routes.get('/team/:id', controller.getTeam); //Correct
+        this.routes.post('/login', controller.login); //Correct
+        this.routes.get('/refresh', refreshTokenVerify, controller.refreshToken); //Correct
+        this.routes.get('/user', tokenVerify, controller.getUser); //Correct
+        this.routes.post('/user', tokenVerify, controller.newUser); //Correct
+        this.routes.put('/user', tokenVerify, controller.editUser); //Correct
+        this.routes.delete('/user', tokenVerify, controller.deleteUser); //Correct;
+        this.routes.post('/task', tokenVerify, controller.newTask); //Correct;
+        this.routes.get('/task', tokenVerify, controller.getTasks); //Correct
+        this.routes.put('/task', tokenVerify, controller.updateTask); //Correct
+        this.routes.delete('/task', tokenVerify, controller.deleteTask); //Correct
+        this.routes.put('/team', tokenVerify, controller.editTeam); //Correct
+        this.routes.delete('/team', tokenVerify, controller.deleteTeam); //Correct
     }
 }
 exports.Router = Router;
